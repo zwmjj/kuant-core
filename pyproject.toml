@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kuant-core"
+version = "0.3.0"
+description = "Production-grade quantitative research framework: event-driven backtester, factor library, risk toolkit, walk-forward CV, and multi-asset portfolio construction."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "zwmjj" },
+]
+keywords = [
+    "quant", "quantitative-finance", "backtest", "factor-research",
+    "portfolio-optimization", "risk", "systematic-trading",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering",
+]
+
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0,<2.3",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+    "scikit-learn>=1.3",
+    "statsmodels>=0.14",
+]
+
+[project.optional-dependencies]
+us-data = [
+    "wrds>=3.1",
+    "pandas-datareader>=0.10",
+    "yfinance>=0.2",
+]
+cn-data = [
+    "baostock>=0.8",
+    "akshare>=1.10",
+    "tushare>=1.4",
+]
+ml = [
+    "lightgbm>=4.0",
+    "xgboost>=2.0",
+]
+alpaca = [
+    "alpaca-py>=0.30",
+]
+full = [
+    "kuant-core[us-data,cn-data,ml,alpaca]",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/zwmjj/kuant-core"
+Repository = "https://github.com/zwmjj/kuant-core"
+Issues = "https://github.com/zwmjj/kuant-core/issues"
+
+[tool.setuptools.packages.find]
+include = ["qf*"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
