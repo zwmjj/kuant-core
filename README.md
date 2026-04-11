@@ -5,11 +5,19 @@ factor library, risk toolkit, walk-forward CV, multi-asset portfolio
 construction. Extracted from the Kuant research platform as a
 standalone pip-installable library.
 
-> **Companion projects:**
-> [`kuant-research`](https://github.com/zwmjj/kuant-research) — 14
-> reproducible empirical studies built on this library.
-> [`alt-data-research`](https://github.com/zwmjj/alt-data-research) —
-> SEC NLP alt-data alpha factor research (t-stat 2.11, ICIR 0.80).
+## Ecosystem
+
+This is one of **six open-source repositories** that together form a
+complete quant research platform. Total ~55,000 LOC, MIT licensed.
+
+| Repo | Role | LOC |
+|---|---|---|
+| [`alt-data-research`](https://github.com/zwmjj/alt-data-research) ⭐ | SEC NLP + 13F alt-data alpha — **t-stat 2.11, ICIR 0.80** | ~2.5k |
+| [`kuant-research`](https://github.com/zwmjj/kuant-research) | 14 reproducible empirical studies with committed expected outputs | ~3k |
+| **`kuant-core`** (this repo) | Production quant research library — 28+ factors, walk-forward CV, 5 cost models, US + CN A-share | ~20k |
+| [`kuant-strategies`](https://github.com/zwmjj/kuant-strategies) | 25+ strategies built on kuant-core: momentum, mean-rev, crypto, options, ML, alt-data | ~17k |
+| [`kuant-api`](https://github.com/zwmjj/kuant-api) | FastAPI research backend — 20 routers, Monaco IDE, WebSocket, JWT auth | ~5k |
+| [`kuant-web`](https://github.com/zwmjj/kuant-web) | Next.js 16 + Tailwind + Recharts dashboard — 20 panels | ~7k |
 
 ## Scope
 
