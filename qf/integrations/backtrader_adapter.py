@@ -1,6 +1,6 @@
-"""Backtrader 策略适配器
+"""Backtrader strategy adapter
 Backtrader: https://github.com/mementum/backtrader
-将 Kuant 信号转为 Backtrader 策略, 支持日频事件驱动回测。
+Converts Kuant signals into a Backtrader strategy, supporting daily event-driven backtests.
 """
 import warnings
 import numpy as np
@@ -29,19 +29,19 @@ def _check_bt():
 if _HAS_BT:
 
     class KQBacktraderStrategy(bt.Strategy):
-        """Kuant 信号驱动的 Backtrader 策略。
+        """Backtrader strategy driven by Kuant signals.
 
-        将预计算的 KQ 信号矩阵 (date x stock) 注入 Backtrader 框架,
-        在每个 rebalance bar 上按信号排名分配仓位。
+        Injects a precomputed KQ signal matrix (date x stock) into the Backtrader
+        framework and allocates positions by signal rank on every rebalance bar.
 
         Parameters (via params)
         -----------------------
         signal_dict : dict
             {stock_name: pd.Series(date -> signal_value)}
         top_n : int
-            做多股票数量
+            Number of stocks to hold long
         rebalance_freq : int
-            再平衡频率 (bar 数, 如月频=21)
+            Rebalance frequency (in bars, e.g. monthly = 21)
         """
 
         params = (
@@ -101,7 +101,7 @@ if _HAS_BT:
 else:
     # Fallback stub when backtrader is not installed
     class KQBacktraderStrategy:
-        """Stub: backtrader 未安装。"""
+        """Stub: backtrader is not installed."""
 
         def __init__(self, *args, **kwargs):
             raise ImportError("backtrader 未安装。请运行: pip install backtrader")
@@ -130,27 +130,27 @@ def run_bt_backtest(
     top_n: int = 20,
     rebalance_freq: int = 21,
 ) -> dict:
-    """使用 Backtrader 运行回测。
+    """Run a backtest with Backtrader.
 
     Parameters
     ----------
     signal : pd.DataFrame
-        KQ 信号矩阵 (date x stock)
+        KQ signal matrix (date x stock)
     prices : pd.DataFrame
-        价格矩阵 (date x stock), 日频
+        Price matrix (date x stock), daily frequency
     cash : float
-        初始资金
+        Initial capital
     commission : float
-        手续费率
+        Commission rate
     top_n : int
-        持仓数量
+        Number of holdings
     rebalance_freq : int
-        再平衡频率 (交易日)
+        Rebalance frequency (trading days)
 
     Returns
     -------
     dict
-        回测结果, 含 final_value, total_return, trades 等
+        Backtest results, including final_value, total_return, trades, etc.
     """
     _check_bt()
 
@@ -201,14 +201,14 @@ def run_bt_backtest(
 
 
 def convert_bt_results(cerebro, initial_cash: float = 1_000_000.0) -> dict:
-    """将 Backtrader cerebro 结果转为 JSON-serializable dict。
+    """Convert Backtrader cerebro results into a JSON-serializable dict.
 
     Parameters
     ----------
     cerebro : bt.Cerebro
-        已运行的 Cerebro 实例
+        A Cerebro instance that has already been run
     initial_cash : float
-        初始资金
+        Initial capital
 
     Returns
     -------

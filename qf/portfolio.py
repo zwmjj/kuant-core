@@ -1,4 +1,4 @@
-"""协方差估计 + 组合优化"""
+"""Covariance estimation + portfolio optimization"""
 import numpy as np
 import pandas as pd
 

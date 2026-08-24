@@ -1,6 +1,7 @@
-"""Tushare Pro 数据适配器 — A股数据源
+"""Tushare Pro data adapter - China A-share data source.
 Tushare Pro: https://github.com/waditu/tushare
-提供A股日频/财务/指数数据，需要注册获取 token。
+Serves A-share daily bars, financial statements and index data. Requires a
+registered API token.
 """
 import os
 import pickle
@@ -52,12 +53,12 @@ def _save_cache(name: str, data):
 
 
 def init_tushare(token: str):
-    """初始化 Tushare Pro API。
+    """Initialize the Tushare Pro API.
 
     Parameters
     ----------
     token : str
-        Tushare Pro 注册 token (https://tushare.pro/register)
+        Tushare Pro registration token (https://tushare.pro/register)
     """
     global _pro
     if not _HAS_TUSHARE:
@@ -82,19 +83,19 @@ def get_stock_daily(
     start: str = "20100101",
     end: str = "20251231",
 ) -> pd.DataFrame:
-    """获取个股日频行情（前复权）。
+    """Fetch daily bars for a single stock, back-adjusted for corporate actions.
 
     Parameters
     ----------
     ts_code : str
-        Tushare 股票代码, 如 '000001.SZ'
+        Tushare ticker, e.g. '000001.SZ'
     start, end : str
-        日期范围, 格式 YYYYMMDD
+        Date range, formatted YYYYMMDD
 
     Returns
     -------
     pd.DataFrame
-        含 trade_date, open, high, low, close, vol, amount 等列
+        Columns include trade_date, open, high, low, close, vol, amount
     """
     pro = _ensure_pro()
     cache_key = f"daily_{ts_code}_{start}_{end}"
@@ -120,19 +121,20 @@ def get_financials(
     ts_code: str,
     period: str = "",
 ) -> pd.DataFrame:
-    """获取财务指标数据（利润表/资产负债表关键指标）。
+    """Fetch financial indicators (headline income-statement and balance-sheet items).
 
     Parameters
     ----------
     ts_code : str
-        Tushare 股票代码
+        Tushare ticker
     period : str
-        报告期, 如 '20231231'；留空则获取最近所有报告期
+        Reporting period, e.g. '20231231'; leave empty to fetch all recent
+        reporting periods
 
     Returns
     -------
     pd.DataFrame
-        含 eps, roe, roa, grossprofit_margin 等指标
+        Columns include eps, roe, roa, grossprofit_margin
     """
     pro = _ensure_pro()
     cache_key = f"fin_{ts_code}_{period}"
@@ -159,14 +161,14 @@ def get_index_daily(
     start: str = "20100101",
     end: str = "20251231",
 ) -> pd.DataFrame:
-    """获取指数日频行情。
+    """Fetch daily index bars.
 
     Parameters
     ----------
     index_code : str
-        指数代码, 如 '000300.SH' (沪深300), '000905.SH' (中证500)
+        Index code, e.g. '000300.SH' (CSI 300), '000905.SH' (CSI 500)
     start, end : str
-        日期范围, 格式 YYYYMMDD
+        Date range, formatted YYYYMMDD
 
     Returns
     -------
@@ -194,19 +196,19 @@ def get_adj_factor(
     start: str = "20100101",
     end: str = "20251231",
 ) -> pd.DataFrame:
-    """获取复权因子。
+    """Fetch adjustment factors.
 
     Parameters
     ----------
     ts_code : str
-        Tushare 股票代码
+        Tushare ticker
     start, end : str
-        日期范围
+        Date range
 
     Returns
     -------
     pd.DataFrame
-        含 trade_date, adj_factor 列
+        Columns trade_date, adj_factor
     """
     pro = _ensure_pro()
     cache_key = f"adj_{ts_code}_{start}_{end}"

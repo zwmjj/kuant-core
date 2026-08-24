@@ -1,15 +1,16 @@
-"""策略表现异常检测模块
+"""Strategy performance anomaly detection module
 
-提供基于统计方法和机器学习的策略运行时异常检测，
-可与 RiskManager 和 RiskAnalyzer 配合使用，实现更细粒度的策略健康监控。
+Provides runtime anomaly detection for live strategies using statistical and
+machine-learning methods. Works alongside RiskManager and RiskAnalyzer for
+finer-grained strategy health monitoring.
 
-检测方法:
-    - Z-score 异常检测（滚动均值/标准差）
-    - Isolation Forest 多维异常检测
-    - 回撤阈值告警
-    - 市场状态突变检测（均值突变 CUSUM）
+Detection methods:
+    - Z-score anomaly detection (rolling mean/standard deviation)
+    - Isolation Forest multivariate anomaly detection
+    - Drawdown threshold alerts
+    - Market regime change detection (CUSUM mean-shift)
 
-依赖: numpy, pandas, scikit-learn (已在项目中安装)
+Dependencies: numpy, pandas, scikit-learn (already installed in this project)
 """
 
 import datetime
@@ -37,31 +38,32 @@ METRIC_FACTOR_EXPOSURE = "factor_exposure"  # 因子暴露变化
 
 
 class StrategyAnomalyDetector:
-    """策略表现异常检测器
+    """Strategy performance anomaly detector
 
-    实时接收策略运行指标，通过多种检测方法识别异常行为并生成告警。
+    Consumes live strategy metrics and applies several detection methods to
+    identify anomalous behaviour and raise alerts.
 
     Parameters
     ----------
     window : int
-        滚动窗口大小（数据点数），用于 Z-score 计算，默认 60
+        Rolling window size (number of data points) used for the Z-score, default 60
     z_threshold : float
-        Z-score 异常阈值，默认 2.5（超过则 warning），3.5 则 critical
+        Z-score anomaly threshold, default 2.5 (above this: warning); 3.5 raises critical
     drawdown_warning : float
-        回撤 warning 阈值（正值，如 0.08 表示 8%），默认 0.08
+        Drawdown warning threshold (positive value, e.g. 0.08 means 8%), default 0.08
     drawdown_critical : float
-        回撤 critical 阈值，默认 0.15
+        Drawdown critical threshold, default 0.15
     isolation_contamination : float
-        IsolationForest 的 contamination 参数，默认 0.05
+        contamination parameter for IsolationForest, default 0.05
     cusum_threshold : float
-        CUSUM 检测的阈值系数（相对标准差的倍数），默认 4.0
+        Threshold coefficient for CUSUM detection (as a multiple of the standard deviation), default 4.0
     max_history : int
-        保留的最大历史数据点数，默认 500
+        Maximum number of historical data points retained, default 500
 
     Examples
     --------
     >>> detector = StrategyAnomalyDetector(window=30, z_threshold=2.5)
-    >>> # 模拟每日更新
+    >>> # simulate daily updates
     >>> import numpy as np
     >>> np.random.seed(42)
     >>> for i in range(100):
@@ -74,7 +76,7 @@ class StrategyAnomalyDetector:
     ...     }
     ...     ts = datetime.datetime(2025, 1, 1) + datetime.timedelta(days=i)
     ...     detector.update(ts, metrics)
-    >>> # 注入一个异常点
+    >>> # inject an anomalous point
     >>> detector.update(
     ...     datetime.datetime(2025, 4, 11),
     ...     {"return": -0.15, "volatility": 0.60, "max_drawdown": -0.20,
@@ -83,7 +85,7 @@ class StrategyAnomalyDetector:
     >>> alerts = detector.check_alerts()
     >>> for a in alerts:
     ...     print(f"[{a['severity']}] {a['type']}: {a['message']}")
-    >>> print(f"策略健康分: {detector.get_health_score()}")
+    >>> print(f"Strategy health score: {detector.get_health_score()}")
     """
 
     def __init__(
@@ -137,16 +139,16 @@ class StrategyAnomalyDetector:
     # ==================================================================
 
     def update(self, timestamp: Any, metrics_dict: Dict[str, float]) -> None:
-        """实时更新一个数据点
+        """Update the detector with one new data point
 
         Parameters
         ----------
-        timestamp : datetime 或任意可序列化的时间标识
-            当前数据点的时间戳
+        timestamp : datetime or any serializable time identifier
+            Timestamp of the current data point
         metrics_dict : dict
-            指标字典，键为指标名，值为浮点数。
-            支持的键: "return", "volatility", "max_drawdown", "turnover", "factor_exposure"
-            不存在的键会用 NaN 填充。
+            Metric dictionary keyed by metric name with float values.
+            Supported keys: "return", "volatility", "max_drawdown", "turnover", "factor_exposure"
+            Missing keys are filled with NaN.
         """
         self._timestamps.append(timestamp)
         for name in self._metric_names:
@@ -192,15 +194,15 @@ class StrategyAnomalyDetector:
     # ==================================================================
 
     def z_score_detector(self) -> List[Dict[str, Any]]:
-        """基于滚动均值/标准差的 Z-score 异常检测
+        """Z-score anomaly detection based on rolling mean/standard deviation
 
-        对每个监控指标计算当前值相对于滚动窗口的 Z-score，
-        超过阈值则产生告警。
+        Computes each monitored metric's current value as a Z-score against its
+        rolling window and raises an alert when the threshold is exceeded.
 
         Returns
         -------
         list of dict
-            告警列表
+            List of alerts
         """
         alerts = []
         for name in self._metric_names:
@@ -256,15 +258,15 @@ class StrategyAnomalyDetector:
         return alerts
 
     def isolation_forest_detector(self) -> List[Dict[str, Any]]:
-        """基于 IsolationForest 的多维异常检测
+        """Multivariate anomaly detection based on IsolationForest
 
-        将所有监控指标作为特征向量，训练 IsolationForest 模型，
-        检测最新数据点是否为多维空间中的异常。
+        Treats all monitored metrics as a feature vector, fits an IsolationForest
+        model, and tests whether the latest data point is an outlier in that space.
 
         Returns
         -------
         list of dict
-            告警列表
+            List of alerts
         """
         alerts = []
         n_points = len(self._timestamps)
@@ -304,14 +306,14 @@ class StrategyAnomalyDetector:
         return alerts
 
     def drawdown_alert(self) -> List[Dict[str, Any]]:
-        """回撤超阈值告警
+        """Drawdown threshold alerts
 
-        检查最新的 max_drawdown 指标是否超过预设阈值。
+        Checks whether the latest max_drawdown metric exceeds the configured thresholds.
 
         Returns
         -------
         list of dict
-            告警列表
+            List of alerts
         """
         alerts = []
         dd_values = list(self._history[METRIC_MAX_DRAWDOWN])
@@ -342,17 +344,18 @@ class StrategyAnomalyDetector:
         return alerts
 
     def regime_change_detector(self) -> List[Dict[str, Any]]:
-        """市场状态突变检测（基于 CUSUM 算法）
+        """Market regime change detection (CUSUM algorithm)
 
-        CUSUM (Cumulative Sum) 通过累积偏差来检测均值突变。
-        当累积和超过阈值时，认为发生了状态突变。
+        CUSUM (Cumulative Sum) detects mean shifts by accumulating deviations.
+        A regime change is flagged once the cumulative sum crosses the threshold.
 
-        相比 HMM，CUSUM 更轻量、无需额外依赖，且对在线检测更友好。
+        Compared with an HMM, CUSUM is lighter, needs no extra dependencies, and
+        is better suited to online detection.
 
         Returns
         -------
         list of dict
-            告警列表
+            List of alerts
         """
         alerts = []
         for name in self._metric_names:
@@ -401,17 +404,17 @@ class StrategyAnomalyDetector:
     # ==================================================================
 
     def check_alerts(self) -> List[Dict[str, Any]]:
-        """运行所有检测方法，返回合并的告警列表
+        """Run every detection method and return the combined list of alerts
 
         Returns
         -------
         list of dict
-            每个告警包含:
-            - "type": str  检测方法名 ("z_score" | "isolation_forest" | "drawdown" | "regime_change")
-            - "severity": str  严重级别 ("warning" | "critical")
-            - "message": str  告警描述
-            - "timestamp": Any  告警关联的时间戳
-            - "details": dict  附加信息
+            Each alert contains:
+            - "type": str  detection method name ("z_score" | "isolation_forest" | "drawdown" | "regime_change")
+            - "severity": str  severity level ("warning" | "critical")
+            - "message": str  alert description
+            - "timestamp": Any  timestamp the alert is associated with
+            - "details": dict  additional information
         """
         alerts = []
         alerts.extend(self.z_score_detector())
@@ -427,18 +430,18 @@ class StrategyAnomalyDetector:
         return alerts
 
     def get_health_score(self) -> float:
-        """计算策略健康分 (0-100)
+        """Compute the strategy health score (0-100)
 
-        综合多个维度评估策略当前健康状态:
-        - Z-score 偏离程度 (权重 30%)
-        - 回撤状态 (权重 30%)
-        - IsolationForest 异常分 (权重 20%)
-        - CUSUM 突变程度 (权重 20%)
+        Assesses current strategy health across several dimensions:
+        - Z-score deviation (weight 30%)
+        - Drawdown state (weight 30%)
+        - IsolationForest anomaly score (weight 20%)
+        - CUSUM shift magnitude (weight 20%)
 
         Returns
         -------
         float
-            健康分，100 为完全健康，0 为极度异常
+            Health score; 100 is fully healthy, 0 is severely anomalous
         """
         scores = []
         weights = []
@@ -668,12 +671,12 @@ class StrategyAnomalyDetector:
     # ==================================================================
 
     def get_metric_summary(self) -> Dict[str, Dict[str, float]]:
-        """获取各指标的统计摘要
+        """Get summary statistics for each metric
 
         Returns
         -------
         dict
-            {指标名: {"current": ..., "mean": ..., "std": ..., "z_score": ..., "min": ..., "max": ...}}
+            {metric_name: {"current": ..., "mean": ..., "std": ..., "z_score": ..., "min": ..., "max": ...}}
         """
         summary = {}
         for name in self._metric_names:
@@ -702,7 +705,7 @@ class StrategyAnomalyDetector:
         return summary
 
     def reset(self) -> None:
-        """重置检测器状态"""
+        """Reset the detector state."""
         for name in self._metric_names:
             self._history[name].clear()
             self._cusum_pos[name] = 0.0

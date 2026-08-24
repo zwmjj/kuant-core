@@ -1,7 +1,7 @@
-"""FinRL 深度强化学习适配器
+"""FinRL deep reinforcement learning adapter
 FinRL: https://github.com/AI4Finance-Foundation/FinRL
-封装 Stable-Baselines3 的 PPO/A2C/DDPG/SAC/TD3 算法,
-构建股票交易 RL 环境并训练/评估 agent。
+Wraps the Stable-Baselines3 PPO/A2C/DDPG/SAC/TD3 algorithms to build a stock
+trading RL environment and train/evaluate agents.
 """
 import warnings
 import numpy as np
@@ -58,21 +58,21 @@ def _check_sb3():
 
 
 class StockTradingEnv(gym.Env):
-    """简化版股票交易 RL 环境 (FinRL StockTradingEnv 风格)。
+    """Simplified stock trading RL environment (FinRL StockTradingEnv style).
 
     Observation: [cash_balance, stock_holdings..., stock_prices..., features...]
-    Action:      连续值 [-1, 1] 对应 [卖出, 买入] 每只股票
+    Action:      continuous values in [-1, 1] mapping to [sell, buy] for each stock
 
     Parameters
     ----------
     prices : np.ndarray
-        形状 (n_steps, n_stocks), 收盘价
+        Shape (n_steps, n_stocks), closing prices
     features : np.ndarray
-        形状 (n_steps, n_stocks * n_features), 额外特征
+        Shape (n_steps, n_stocks * n_features), additional features
     initial_cash : float
-        初始资金
+        Initial capital
     transaction_cost : float
-        交易成本比例
+        Transaction cost rate
     """
 
     metadata = {"render_modes": []}
@@ -184,21 +184,21 @@ def prepare_rl_env(
     transaction_cost: float = 0.001,
     max_shares: int = 100,
 ) -> "StockTradingEnv":
-    """构建股票交易 RL 环境。
+    """Build a stock trading RL environment.
 
     Parameters
     ----------
     prices : pd.DataFrame
-        价格矩阵 (date x stock), 日频
+        Price matrix (date x stock), daily frequency
     features : pd.DataFrame, optional
-        特征矩阵 (date x n), 如技术指标。
-        若为 None 则使用价格的简单技术特征。
+        Feature matrix (date x n), e.g. technical indicators.
+        If None, simple technical features derived from prices are used.
     initial_cash : float
-        初始资金
+        Initial capital
     transaction_cost : float
-        交易成本
+        Transaction cost
     max_shares : int
-        每只股票最大持仓股数
+        Maximum number of shares held per stock
 
     Returns
     -------
@@ -234,18 +234,18 @@ def train_drl_agent(
     timesteps: int = 100_000,
     **kwargs,
 ) -> Any:
-    """训练深度 RL agent。
+    """Train a deep RL agent.
 
     Parameters
     ----------
     env : StockTradingEnv
-        交易环境
+        Trading environment
     algorithm : str
         'PPO', 'A2C', 'DDPG', 'SAC', 'TD3'
     timesteps : int
-        训练步数
+        Number of training steps
     **kwargs
-        传给 SB3 算法的额外参数
+        Extra arguments passed to the SB3 algorithm
 
     Returns
     -------
@@ -271,16 +271,16 @@ def evaluate_agent(
     env: "StockTradingEnv",
     n_episodes: int = 1,
 ) -> dict:
-    """评估 RL agent 表现。
+    """Evaluate RL agent performance.
 
     Parameters
     ----------
     agent : SB3 model
-        训练好的模型
+        Trained model
     env : StockTradingEnv
-        评估环境 (应使用测试集构建)
+        Evaluation environment (should be built from the test set)
     n_episodes : int
-        评估次数
+        Number of evaluation episodes
 
     Returns
     -------
@@ -336,20 +336,20 @@ def get_rl_actions(
     observation: np.ndarray,
     deterministic: bool = True,
 ) -> np.ndarray:
-    """获取 RL agent 对单个 observation 的动作。
+    """Get the RL agent's action for a single observation.
 
     Parameters
     ----------
     agent : SB3 model
     observation : np.ndarray
-        环境状态向量
+        Environment state vector
     deterministic : bool
-        是否使用确定性策略
+        Whether to use a deterministic policy
 
     Returns
     -------
     np.ndarray
-        动作向量, shape=(n_stocks,), 值域 [-1, 1]
+        Action vector, shape=(n_stocks,), values in [-1, 1]
     """
     _check_sb3()
     action, _ = agent.predict(observation, deterministic=deterministic)

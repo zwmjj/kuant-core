@@ -1,7 +1,7 @@
-"""Qlib 风格 ML 模型适配器
+"""Qlib-style ML model adapter
 Microsoft Qlib: https://github.com/microsoft/qlib
-封装 LightGBM / XGBoost 树模型训练与预测, 支持 walk-forward 验证。
-不直接依赖 Qlib, 而是复现其核心 ML pipeline 模式。
+Wraps LightGBM / XGBoost tree model training and prediction, with walk-forward validation support.
+Does not depend on Qlib directly; it reproduces the core Qlib ML pipeline pattern.
 """
 import warnings
 import numpy as np
@@ -80,23 +80,23 @@ def train_lightgbm_model(
     params: Optional[dict] = None,
     val_ratio: float = 0.15,
 ) -> Any:
-    """训练 LightGBM 回归模型 (Qlib LGBModel 风格)。
+    """Train a LightGBM regression model (Qlib LGBModel style).
 
     Parameters
     ----------
     features : pd.DataFrame
-        特征矩阵 (n_samples x n_features)
+        Feature matrix (n_samples x n_features)
     returns : pd.Series
-        目标变量 (下期收益率)
+        Target variable (next-period return)
     params : dict, optional
-        LightGBM 超参数; None 则使用默认值
+        LightGBM hyperparameters; defaults are used when None
     val_ratio : float
-        验证集比例 (从尾部切分, 保持时间序列顺序)
+        Validation set fraction (split from the tail, preserving time-series order)
 
     Returns
     -------
     lgb.LGBMRegressor
-        训练好的模型
+        The trained model
     """
     if not _HAS_LGB:
         raise ImportError("lightgbm 未安装。请运行: pip install lightgbm")
@@ -136,18 +136,18 @@ def train_xgboost_model(
     params: Optional[dict] = None,
     val_ratio: float = 0.15,
 ) -> Any:
-    """训练 XGBoost 回归模型。
+    """Train an XGBoost regression model.
 
     Parameters
     ----------
     features : pd.DataFrame
-        特征矩阵
+        Feature matrix
     returns : pd.Series
-        目标变量
+        Target variable
     params : dict, optional
-        XGBoost 超参数
+        XGBoost hyperparameters
     val_ratio : float
-        验证集比例
+        Validation set fraction
 
     Returns
     -------
@@ -186,19 +186,19 @@ def predict_alpha(
     model: Any,
     features: pd.DataFrame,
 ) -> pd.Series:
-    """使用训练好的模型预测 alpha。
+    """Predict alpha with a trained model.
 
     Parameters
     ----------
     model : LGBMRegressor | XGBRegressor
-        训练好的树模型
+        A trained tree model
     features : pd.DataFrame
-        特征矩阵
+        Feature matrix
 
     Returns
     -------
     pd.Series
-        预测 alpha, index 与 features 一致
+        Predicted alpha, indexed the same as features
     """
     X = features.values.astype(np.float32)
     # Fill NaN with 0 for prediction (model can handle it via missing)
@@ -212,20 +212,20 @@ def feature_importance(
     feature_names: list = None,
     importance_type: str = "gain",
 ) -> pd.Series:
-    """提取特征重要性。
+    """Extract feature importances.
 
     Parameters
     ----------
     model : LGBMRegressor | XGBRegressor
     feature_names : list, optional
-        特征名称列表
+        List of feature names
     importance_type : str
-        'gain', 'split' (LGB) 或 'weight', 'gain', 'cover' (XGB)
+        'gain', 'split' (LGB) or 'weight', 'gain', 'cover' (XGB)
 
     Returns
     -------
     pd.Series
-        特征重要性, 降序排列
+        Feature importances, sorted descending
     """
     if _HAS_LGB and isinstance(model, lgb.LGBMRegressor):
         imp = model.feature_importances_
@@ -247,20 +247,20 @@ def walk_forward_ml(
     model_type: str = "lightgbm",
     params: Optional[dict] = None,
 ) -> dict:
-    """Walk-forward ML 验证 (Qlib rolling-window style)。
+    """Walk-forward ML validation (Qlib rolling-window style).
 
     Parameters
     ----------
     features : pd.DataFrame
-        特征矩阵 (MultiIndex (date, stock) 或 flat index)
+        Feature matrix (MultiIndex (date, stock) or flat index)
     returns : pd.Series
-        目标变量
+        Target variable
     n_splits : int
-        折数 (时间序列交叉验证)
+        Number of folds (time-series cross-validation)
     model_type : str
-        'lightgbm' 或 'xgboost'
+        'lightgbm' or 'xgboost'
     params : dict, optional
-        模型超参数
+        Model hyperparameters
 
     Returns
     -------
@@ -271,7 +271,7 @@ def walk_forward_ml(
             'ic_mean': float,
             'ic_std': float,
             'mse_mean': float,
-            'predictions': pd.Series,  # OOS 预测拼接
+            'predictions': pd.Series,  # concatenated OOS predictions
         }
     """
     if not _HAS_SKLEARN:

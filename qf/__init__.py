@@ -1,9 +1,9 @@
 """
-qf — 量化研究框架
+qf — Quantitative Research Framework
 ==================
-可插拔策略 + 事件驱动回测 + 风控 + 可视化
+Pluggable strategies + event-driven backtesting + risk control + visualization
 
-使用方法:
+Usage:
   from qf import Framework
   from strategies.momentum import MomentumStrategy
 

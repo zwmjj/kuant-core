@@ -1,8 +1,8 @@
-"""市场体制(Regime)检测系统 — 动态识别趋势/波动率/相关性/流动性/利率/风险偏好体制，
-用于策略权重的自适应调整。
+"""Market regime detection system — dynamically identifies trend / volatility / correlation / liquidity / rate / risk-appetite regimes,
+used to adaptively adjust strategy weights.
 
-数据源: yfinance
-输出: 各维度当前体制标签 + 历史体制序列 + 策略权重建议 + 回测比较
+Data source: yfinance
+Output: current regime label per dimension + historical regime series + suggested strategy weights + backtest comparison
 """
 import warnings
 from typing import Dict, Optional
@@ -38,11 +38,11 @@ def fetch_market_data(
     end: Optional[str] = None,
     tickers: Optional[list] = None,
 ) -> Dict[str, pd.DataFrame]:
-    """通过 yfinance 下载所需 ETF 的 OHLCV 数据。
+    """Download OHLCV data for the required ETFs via yfinance.
 
-    返回:
-        dict 包含 'close', 'high', 'low', 'volume' 四个 DataFrame,
-        index=日期, columns=ticker
+    Returns:
+        dict containing the four DataFrames 'close', 'high', 'low', 'volume',
+        index=date, columns=ticker
     """
     tickers = tickers or REQUIRED_TICKERS
     raw = yf.download(tickers, start=start, end=end, auto_adjust=True, progress=False)
@@ -63,10 +63,10 @@ def fetch_market_data(
 # ════════════════════════════════════════════════════════════════════════
 
 class RegimeDetector:
-    """多维度市场体制检测器
+    """Multi-dimensional market regime detector
 
-    支持六大维度: 趋势、波动率、相关性、流动性、利率、风险偏好。
-    所有方法均为纯函数——传入 market_data (dict of DataFrames), 输出体制标签。
+    Supports six dimensions: trend, volatility, correlation, liquidity, rates, risk appetite.
+    All methods are pure functions — pass in market_data (dict of DataFrames), get regime labels out.
     """
 
     # ──────────────────────────────────────────────────────────
@@ -92,12 +92,12 @@ class RegimeDetector:
 
     @staticmethod
     def detect_trend(market_data: dict) -> pd.Series:
-        """趋势体制序列: bull / bear / sideways
+        """Trend regime series: bull / bear / sideways
 
-        逻辑:
-        - SMA50 > SMA200 且 ADX代理 > 阈值 → bull
-        - SMA50 < SMA200 且 ADX代理 > 阈值 → bear
-        - 其余 → sideways
+        Logic:
+        - SMA50 > SMA200 and ADX proxy > threshold → bull
+        - SMA50 < SMA200 and ADX proxy > threshold → bear
+        - otherwise → sideways
         """
         close = market_data["close"]["SPY"]
         high = market_data["high"]["SPY"]
@@ -120,9 +120,9 @@ class RegimeDetector:
 
     @staticmethod
     def detect_volatility(market_data: dict) -> pd.Series:
-        """波动率体制序列: low_vol / normal_vol / high_vol / crisis
+        """Volatility regime series: low_vol / normal_vol / high_vol / crisis
 
-        20d 年化已实现波动率在过去 252 个交易日中的百分位:
+        Percentile of 20d annualized realized volatility over the trailing 252 trading days:
         - < 25%  → low_vol
         - 25-75% → normal_vol
         - 75-95% → high_vol
@@ -132,7 +132,7 @@ class RegimeDetector:
         rvol = ret.rolling(20, min_periods=15).std() * np.sqrt(252)
 
         def pct_rank(s):
-            """滚动百分位排名"""
+            """Rolling percentile rank"""
             out = s.copy() * np.nan
             vals = s.values
             for i in range(252, len(vals)):
@@ -158,9 +158,9 @@ class RegimeDetector:
 
     @staticmethod
     def detect_correlation(market_data: dict) -> pd.Series:
-        """相关性体制序列: low_corr / normal_corr / high_corr
+        """Correlation regime series: low_corr / normal_corr / high_corr
 
-        行业 ETF 20d 滚动收益率成对相关的均值:
+        Mean pairwise correlation of 20d rolling sector ETF returns:
         - < 0.30 → low_corr
         - 0.30-0.65 → normal_corr
         - > 0.65 → high_corr
@@ -197,12 +197,12 @@ class RegimeDetector:
 
     @staticmethod
     def detect_liquidity(market_data: dict) -> pd.Series:
-        """流动性体制序列: ample / normal_liq / tight
+        """Liquidity regime series: ample / normal_liq / tight
 
-        代理指标:
-        - Bid-ask 代理: (High-Low)/Close 的 20d 均值 (越大=越差)
-        - 成交量趋势: 20d 成交量均值 / 60d 成交量均值
-        综合评分的百分位:
+        Proxy indicators:
+        - Bid-ask proxy: 20d mean of (High-Low)/Close (higher = worse)
+        - Volume trend: 20d mean volume / 60d mean volume
+        Percentile of the composite score:
         - < 30% → ample
         - 30-70% → normal_liq
         - > 70% → tight
@@ -240,14 +240,14 @@ class RegimeDetector:
 
     @staticmethod
     def detect_rate(market_data: dict) -> pd.Series:
-        """利率体制序列: easing / neutral_rate / tightening
+        """Rate regime series: easing / neutral_rate / tightening
 
-        TLT/SHY 比率反映长端 vs 短端债券价格:
-        - 比率上升 (长端涨、收益率降) → easing
-        - 比率下降 (长端跌、收益率升) → tightening
-        - 持平 → neutral_rate
+        The TLT/SHY ratio reflects long-end vs short-end bond prices:
+        - ratio rising (long end up, yields down) → easing
+        - ratio falling (long end down, yields up) → tightening
+        - flat → neutral_rate
 
-        用 60d 变化率的 z-score 判断。
+        Judged by the z-score of the 60d rate of change.
         """
         close = market_data["close"]
         if "TLT" not in close.columns or "SHY" not in close.columns:
@@ -271,13 +271,13 @@ class RegimeDetector:
 
     @staticmethod
     def detect_risk_appetite(market_data: dict) -> pd.Series:
-        """风险偏好体制序列: risk_on / neutral_risk / risk_off
+        """Risk appetite regime series: risk_on / neutral_risk / risk_off
 
-        两个比率的 z-score 均值:
-        - SPY/GLD: 股票 vs 避险黄金
-        - HYG/TLT: 高收益债 vs 国债
+        Mean z-score of two ratios:
+        - SPY/GLD: equities vs safe-haven gold
+        - HYG/TLT: high yield vs Treasuries
 
-        z > 0.5 → risk_on, z < -0.5 → risk_off, 其余 → neutral_risk
+        z > 0.5 → risk_on, z < -0.5 → risk_off, otherwise → neutral_risk
         """
         close = market_data["close"]
         available_pairs = []
@@ -310,12 +310,12 @@ class RegimeDetector:
     # ══════════════════════════════════════════════════════════════
 
     def detect_all(self, market_data: dict) -> dict:
-        """检测所有维度的当前体制。
+        """Detect the current regime across all dimensions.
 
-        参数:
-            market_data: fetch_market_data() 的返回值
-        返回:
-            dict, key=维度名, value=当前体制标签 (str)
+        Args:
+            market_data: the return value of fetch_market_data()
+        Returns:
+            dict, key=dimension name, value=current regime label (str)
         """
         regimes = {}
         regimes["trend"] = self.detect_trend(market_data).dropna().iloc[-1]
@@ -327,13 +327,13 @@ class RegimeDetector:
         return regimes
 
     def get_regime_history(self, market_data: dict, lookback: int = 252) -> pd.DataFrame:
-        """返回最近 lookback 个交易日的体制历史 DataFrame。
+        """Return a DataFrame of regime history over the last `lookback` trading days.
 
-        参数:
-            market_data: fetch_market_data() 的返回值
-            lookback: 回看天数
-        返回:
-            DataFrame, index=日期, columns=[trend, volatility, correlation, liquidity, rate, risk_appetite]
+        Args:
+            market_data: the return value of fetch_market_data()
+            lookback: number of days to look back
+        Returns:
+            DataFrame, index=date, columns=[trend, volatility, correlation, liquidity, rate, risk_appetite]
         """
         trend = self.detect_trend(market_data)
         vol = self.detect_volatility(market_data)
@@ -380,18 +380,18 @@ class RegimeDetector:
 
     @staticmethod
     def get_strategy_weights(regimes: dict) -> dict:
-        """根据当前多维体制输出策略权重。
+        """Derive strategy weights from the current multi-dimensional regime.
 
-        核心逻辑:
-        - Bull + Low Vol → 超配股票, 低配黄金
-        - Bear + High Vol → 超配黄金 + vol_arb, 低配股票
-        - Crisis → 最大现金, 买保护性看跌
-        - Sideways → 超配日历价差 + 均值回归
+        Core logic:
+        - Bull + Low Vol → overweight equities, underweight gold
+        - Bear + High Vol → overweight gold + vol_arb, underweight equities
+        - Crisis → maximum cash, buy protective puts
+        - Sideways → overweight calendar spreads + mean reversion
 
-        参数:
-            regimes: detect_all() 的返回值
-        返回:
-            dict, key=策略名, value=权重 (总和=1)
+        Args:
+            regimes: the return value of detect_all()
+        Returns:
+            dict, key=strategy name, value=weight (sums to 1)
         """
         trend = regimes.get("trend", "sideways")
         vol = regimes.get("volatility", "normal_vol")
@@ -488,22 +488,22 @@ class RegimeDetector:
         sub_strategy_returns: Optional[pd.DataFrame] = None,
         rebalance_freq: int = 5,
     ) -> dict:
-        """回测体制切换策略 vs 静态配置。
+        """Backtest the regime-switching strategy vs a static allocation.
 
-        参数:
-            market_data: fetch_market_data() 的返回值
-            sub_strategy_returns: DataFrame, index=日期, columns=策略名, 值=日收益率
-                若为 None 则使用简单代理 (SPY=stocks, TLT=bonds, GLD=gold, 其余=合成)
-            rebalance_freq: 再平衡频率 (交易日)
-        返回:
-            dict 包含:
-            - 'regime_sharpe': 体制切换策略年化 Sharpe
-            - 'static_sharpe': 静态配置年化 Sharpe
-            - 'regime_returns': Series (日收益)
-            - 'static_returns': Series (日收益)
-            - 'regime_cumulative': Series (累计净值)
-            - 'static_cumulative': Series (累计净值)
-            - 'regime_weights_history': DataFrame (权重时间序列)
+        Args:
+            market_data: the return value of fetch_market_data()
+            sub_strategy_returns: DataFrame, index=date, columns=strategy name, values=daily returns
+                If None, simple proxies are used (SPY=stocks, TLT=bonds, GLD=gold, rest=synthetic)
+            rebalance_freq: rebalance frequency (trading days)
+        Returns:
+            dict containing:
+            - 'regime_sharpe': annualized Sharpe of the regime-switching strategy
+            - 'static_sharpe': annualized Sharpe of the static allocation
+            - 'regime_returns': Series (daily returns)
+            - 'static_returns': Series (daily returns)
+            - 'regime_cumulative': Series (cumulative equity)
+            - 'static_cumulative': Series (cumulative equity)
+            - 'regime_weights_history': DataFrame (weight time series)
         """
         # ── 子策略收益代理 ──
         if sub_strategy_returns is None:
@@ -631,7 +631,7 @@ class RegimeDetector:
 # ════════════════════════════════════════════════════════════════════════
 
 def main():
-    """下载数据 → 检测体制 → 输出权重 → 回测比较"""
+    """Download data → detect regimes → output weights → compare backtests"""
     print("=" * 60)
     print("  市场体制检测系统")
     print("=" * 60)

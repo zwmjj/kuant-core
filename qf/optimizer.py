@@ -1,4 +1,4 @@
-"""策略优化器 — 多因子混合、波动率目标、回撤控制"""
+"""Strategy optimizer — multi-factor blending, volatility targeting, drawdown control"""
 import numpy as np
 import pandas as pd
 
@@ -6,7 +6,7 @@ import pandas as pd
 # ── 1. 多因子信号混合 ──
 
 def build_combo_signal(combo_name, data, cap_quantile=0.75, verbose=True):
-    """按名称构建优化组合信号"""
+    """Build an optimized combo signal by name"""
     cfg = OPTIMIZED_COMBOS.get(combo_name)
     if cfg is None:
         raise ValueError(f"未知组合: {combo_name}")
@@ -128,15 +128,15 @@ def _build_ultimate_signal(data, cap_quantile=0.75, verbose=True):
 
 def blend_factors(data, factor_ids, weights=None, method='risk_parity',
                   lookback=36, cap_quantile=0.75, verbose=True):
-    """在股票层面混合多因子信号
+    """Blend multiple factor signals at the stock level
 
     Parameters
     ----------
     method : str
-        'equal' - 等权混合
-        'risk_parity' - 按因子波动率倒数加权（基于滚动回测收益）
-        'sharpe_weighted' - 按因子滚动夏普加权
-        'fixed' - 使用 weights 参数指定的固定权重
+        'equal' - equal-weighted blend
+        'risk_parity' - weight by the inverse of each factor's volatility (from rolling backtest returns)
+        'sharpe_weighted' - weight by each factor's rolling Sharpe ratio
+        'fixed' - use the fixed weights given by the weights argument
     """
     from qf.signals import build_factor_signal, SignalGenerator
 
@@ -332,16 +332,16 @@ OPTIMIZED_COMBOS = {
 # ── 3. 波动率目标 + 回撤控制 ──
 
 def vol_target_scale(returns_history, target_vol=0.10, lookback=6, max_leverage=1.5):
-    """计算波动率目标的仓位缩放因子
+    """Compute the position scaling factor for volatility targeting
 
     Parameters
     ----------
     target_vol : float
-        年化目标波动率 (default 10%)
+        Annualized target volatility (default 10%)
     lookback : int
-        回望月数 (default 6)
+        Lookback window in months (default 6)
     max_leverage : float
-        最大杠杆 (default 1.5)
+        Maximum leverage (default 1.5)
     """
     if len(returns_history) < lookback:
         return 1.0
@@ -354,16 +354,16 @@ def vol_target_scale(returns_history, target_vol=0.10, lookback=6, max_leverage=
 
 
 def drawdown_scale(pv_history, threshold_1=0.10, threshold_2=0.20, threshold_3=0.25):
-    """计算回撤控制的仓位缩放因子
+    """Compute the position scaling factor for drawdown control
 
     Parameters
     ----------
     threshold_1 : float
-        轻度回撤阈值 → 减仓至80% (default 10%)
+        Mild drawdown threshold → cut positions to 80% (default 10%)
     threshold_2 : float
-        中度回撤阈值 → 减仓至50% (default 20%)
+        Moderate drawdown threshold → cut positions to 50% (default 20%)
     threshold_3 : float
-        重度回撤阈值 → 减仓至25% (default 25%)
+        Severe drawdown threshold → cut positions to 25% (default 25%)
     """
     if len(pv_history) < 3:
         return 1.0
@@ -404,7 +404,7 @@ def run_optimized_backtest(d, signal, target_vol=0.10, dd_control=True,
                            long_n=20, short_n=20, base_long_pct=1.15, base_short_pct=0.15,
                            weight_mode='inv_vol', turnover_penalty=0.25,
                            cost_model='sqrt', verbose=True, initial_capital=10000, **cost_kw):
-    """运行带波动率目标和回撤控制的优化回测"""
+    """Run the optimized backtest with volatility targeting and drawdown control"""
     from qf.backtest import DataHandler, StrategyEngine, Portfolio, EventDrivenBacktester, BacktestResult
     from qf.costs import ExecutionHandler
 

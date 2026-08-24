@@ -1,7 +1,7 @@
-"""quantstats-lumi 绩效报告适配器
+"""quantstats-lumi performance reporting adapter
 quantstats-lumi: https://github.com/Lumiwealth/quantstats_lumi
-提供策略绩效报告、基准比较、回撤分析、月度热力图等。
-结果以 dict 返回, 方便 JSON 序列化传给 API 层。
+Provides strategy performance reports, benchmark comparison, drawdown analysis, monthly heatmaps and more.
+Results are returned as dicts for easy JSON serialization to the API layer.
 """
 import warnings
 import numpy as np
@@ -55,23 +55,23 @@ def generate_report(
     output_file: Optional[str] = None,
     title: str = "Kuant Strategy Report",
 ) -> Optional[str]:
-    """生成完整 HTML 绩效报告。
+    """Generate a full HTML performance report.
 
     Parameters
     ----------
     returns : pd.Series or pd.DataFrame
-        策略收益率序列 (日频)
+        Strategy return series (daily)
     benchmark : pd.Series or pd.DataFrame, optional
-        基准收益率序列
+        Benchmark return series
     output_file : str, optional
-        输出 HTML 文件路径。若为 None 返回 HTML 字符串
+        Output HTML file path. If None, the HTML string is returned
     title : str
-        报告标题
+        Report title
 
     Returns
     -------
     str or None
-        HTML 字符串 (若 output_file=None), 否则写入文件返回 None
+        HTML string (if output_file=None), otherwise the file is written and None is returned
     """
     _check_qs()
 
@@ -100,16 +100,16 @@ def compute_metrics(
     benchmark: Optional[Union[pd.Series, pd.DataFrame]] = None,
     risk_free_rate: float = 0.0,
 ) -> dict:
-    """计算综合绩效指标。
+    """Compute a comprehensive set of performance metrics.
 
     Parameters
     ----------
     returns : pd.Series or pd.DataFrame
-        策略收益率序列
+        Strategy return series
     benchmark : pd.Series or pd.DataFrame, optional
-        基准收益率序列
+        Benchmark return series
     risk_free_rate : float
-        无风险利率 (年化)
+        Risk-free rate (annualized)
 
     Returns
     -------
@@ -170,14 +170,14 @@ def compute_drawdown_analysis(
     returns: Union[pd.Series, pd.DataFrame],
     top_n: int = 5,
 ) -> dict:
-    """回撤分析。
+    """Drawdown analysis.
 
     Parameters
     ----------
     returns : pd.Series or pd.DataFrame
-        策略收益率序列
+        Strategy return series
     top_n : int
-        返回最大的 N 次回撤
+        Number of largest drawdowns to return
 
     Returns
     -------
@@ -214,12 +214,12 @@ def compute_drawdown_analysis(
 def compute_monthly_returns(
     returns: Union[pd.Series, pd.DataFrame],
 ) -> dict:
-    """计算月度收益矩阵 (用于热力图)。
+    """Compute the monthly return matrix (for heatmaps).
 
     Parameters
     ----------
     returns : pd.Series or pd.DataFrame
-        策略收益率序列 (日频)
+        Strategy return series (daily)
 
     Returns
     -------
@@ -260,16 +260,16 @@ def compare_strategies(
     benchmark: Optional[Union[pd.Series, pd.DataFrame]] = None,
     risk_free_rate: float = 0.0,
 ) -> dict:
-    """比较多个策略的绩效。
+    """Compare the performance of multiple strategies.
 
     Parameters
     ----------
     strategies : dict
         {strategy_name: returns_series}
     benchmark : pd.Series or pd.DataFrame, optional
-        基准收益率
+        Benchmark returns
     risk_free_rate : float
-        无风险利率
+        Risk-free rate
 
     Returns
     -------
@@ -295,23 +295,23 @@ def snapshot(
     title: str = "Strategy Snapshot",
     output_file: Optional[str] = None,
 ) -> dict:
-    """生成策略快照 (含关键指标 + 简要绩效数据)。
+    """Generate a strategy snapshot (key metrics plus a brief performance summary).
 
     Parameters
     ----------
     returns : pd.Series or pd.DataFrame
-        策略收益率序列
+        Strategy return series
     benchmark : pd.Series or pd.DataFrame, optional
-        基准收益率
+        Benchmark returns
     title : str
-        报告标题
+        Report title
     output_file : str, optional
-        若提供则保存图表到文件
+        If provided, the chart is saved to this file
 
     Returns
     -------
     dict
-        快照摘要
+        Snapshot summary
     """
     _check_qs()
 

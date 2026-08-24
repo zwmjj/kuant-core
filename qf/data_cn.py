@@ -1,4 +1,4 @@
-"""A股数据加载 — baostock (免费无限流)"""
+"""A-share data loading — baostock (free, unlimited)"""
 import os, pickle, warnings, time
 import baostock as bs
 import pandas as pd
@@ -34,7 +34,7 @@ def _bs_login():
 
 
 def get_csi300_codes():
-    """获取沪深300成分股"""
+    """Fetch the CSI 300 constituents"""
     cached = _load_cache("bs_cons300")
     if cached is not None:
         return cached
@@ -53,7 +53,7 @@ def get_csi300_codes():
 
 
 def get_stock_monthly_bs(codes, start='2010-01-01', end='2025-12-31'):
-    """用baostock批量下载月频后复权数据"""
+    """Bulk-download monthly back-adjusted data via baostock"""
     cache_key = f"bs_monthly_{start}_{end}_{len(codes)}"
     cached = _load_cache(cache_key)
     if cached is not None:
@@ -97,7 +97,7 @@ def get_stock_monthly_bs(codes, start='2010-01-01', end='2025-12-31'):
 
 
 def prepare_cn_data(start='2010-01-01', end='2025-12-31'):
-    """加载A股全套数据"""
+    """Load the full A-share dataset"""
     print("加载A股数据 (baostock)...")
 
     codes = get_csi300_codes()

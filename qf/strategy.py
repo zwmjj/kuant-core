@@ -1,18 +1,18 @@
-"""策略基类 — 所有策略实现这个接口"""
+"""Strategy base class - every strategy implements this interface."""
 import pandas as pd
 from abc import ABC, abstractmethod
 
 
 class BaseStrategy(ABC):
     """
-    策略插件接口。任何策略只需实现 generate_signal()。
+    Strategy plugin interface. A strategy only needs to implement generate_signal().
 
-    使用:
+    Usage:
         class MyStrategy(BaseStrategy):
-            name = "我的策略"
+            name = "My Strategy"
             def generate_signal(self, data):
-                # data 是 prepare_data() 返回的字典
-                return signal_dataframe  # (date x permno), 越高越看多
+                # data is the dict returned by prepare_data()
+                return signal_dataframe  # (date x permno), higher = more bullish
     """
     name: str = "未命名策略"
     description: str = ""
@@ -28,13 +28,13 @@ class BaseStrategy(ABC):
     @abstractmethod
     def generate_signal(self, data: dict) -> pd.DataFrame:
         """
-        生成信号DataFrame (date x permno)。
-        值越高 = 越看多, 值越低 = 越看空。
+        Generate a signal DataFrame (date x permno).
+        Higher values = more bullish, lower values = more bearish.
         """
         raise NotImplementedError
 
     def get_params(self) -> dict:
-        """返回策略参数 (用于日志和报告)"""
+        """Return the strategy parameters (used for logging and reporting)."""
         return {
             'name': self.name,
             'long_n': self.long_n,

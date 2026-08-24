@@ -1,4 +1,4 @@
-"""交易成本模型 (5种)"""
+"""Transaction cost models (5 variants)."""
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
@@ -38,7 +38,7 @@ class FillEvent:
 
 
 class ExecutionHandler:
-    """5种交易成本模型: fixed, tiered, sqrt, linear, full"""
+    """Five transaction cost models: fixed, tiered, sqrt, linear, full."""
     def __init__(self, cost_model='sqrt', commission_bps=1.0, spread_bps=5.0,
                  impact_coeff=0.3, short_borrow_bps=30.0, sec_fee_bps=0.8, **kw):
         self.cost_model = cost_model
@@ -97,7 +97,7 @@ class ExecutionHandler:
         return turnover * avg_pos * 0.001 + sec_cost
 
     def compute_holding_return(self, bar, portfolio):
-        """计算现有持仓在本期的回报（不含换仓成本）"""
+        """Compute the return of existing positions for this period (excluding rebalance costs)."""
         rets_row = bar['returns']
         month_ret = 0.0
         for permno, weight in portfolio.long_positions.items():
@@ -109,7 +109,7 @@ class ExecutionHandler:
         return month_ret
 
     def on_order(self, order_event, bar, portfolio):
-        """执行换仓指令，返回换仓成本（不再计算持仓回报）"""
+        """Execute rebalance orders and return the rebalance cost (position returns are not computed here)."""
         tradable = bar['tradable']
         new_long = {}; new_short = {}
         turnover = 0

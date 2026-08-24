@@ -1,10 +1,10 @@
-"""WorldQuant 101 Formulaic Alphas 实现
+"""WorldQuant 101 Formulaic Alphas implementation
 Paper: "101 Formulaic Alphas" — Zura Kakushadze (2015)
 https://arxiv.org/abs/1601.00991
 
-将经典 101 alpha 公式适配为 Kuant SignalGenerator 模式:
-    - 输入为 pandas DataFrame (date x stock)
-    - 输出为截面排名信号, 兼容月频回测
+Adapts the classic 101 alpha formulas to the Kuant SignalGenerator pattern:
+    - Inputs are pandas DataFrames (date x stock)
+    - Outputs are cross-sectionally ranked signals, compatible with monthly backtests
 """
 import warnings
 import numpy as np
@@ -105,21 +105,21 @@ def _product(df: pd.DataFrame, window: int = 10) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 class WorldQuantAlphas:
-    """WorldQuant 101 Formulaic Alphas — 选取的 20 个关键 alpha。
+    """WorldQuant 101 Formulaic Alphas — a selection of 20 key alphas.
 
-    每个 alpha 为静态方法, 输入 OHLCV DataFrames (date x stock),
-    输出信号 DataFrame, 可直接传给 SignalGenerator.cross_sectional_rank()。
+    Each alpha is a static method taking OHLCV DataFrames (date x stock) and returning a
+    signal DataFrame that can be passed straight to SignalGenerator.cross_sectional_rank().
 
-    Parameters (通用)
-    ------------------
+    Parameters (common)
+    -------------------
     open_, high, low, close : pd.DataFrame
-        OHLC 价格矩阵 (date x stock)
+        OHLC price matrices (date x stock)
     volume : pd.DataFrame
-        成交量矩阵
+        Trading volume matrix
     returns : pd.DataFrame
-        收益率矩阵
-    vwap : pd.DataFrame (部分 alpha 需要)
-        成交均价矩阵; 若无可用 (open + high + low + close) / 4 近似
+        Return matrix
+    vwap : pd.DataFrame (required by some alphas)
+        Volume-weighted average price matrix; if unavailable, approximate with (open + high + low + close) / 4
     """
 
     @staticmethod
@@ -365,12 +365,12 @@ class WorldQuantAlphas:
         returns: pd.DataFrame,
         vwap: pd.DataFrame = None,
     ) -> dict:
-        """批量计算所有已实现的 alpha, 返回 {alpha_name: DataFrame}。
+        """Compute every implemented alpha in bulk and return {alpha_name: DataFrame}.
 
         Parameters
         ----------
         vwap : pd.DataFrame, optional
-            若为 None, 则使用 (open + high + low + close) / 4 近似
+            If None, approximated with (open + high + low + close) / 4
         """
         if vwap is None:
             vwap = (open_ + high + low + close) / 4
@@ -412,19 +412,19 @@ class WorldQuantAlphas:
         alpha_df: pd.DataFrame,
         method: str = "rank",
     ) -> pd.DataFrame:
-        """将 alpha 原始值转为 Kuant 风格截面信号 [-1, 1]。
+        """Convert raw alpha values into a Kuant-style cross-sectional signal in [-1, 1].
 
         Parameters
         ----------
         alpha_df : pd.DataFrame
-            alpha 原始值矩阵
+            Raw alpha value matrix
         method : str
-            'rank' 截面百分位排名 | 'zscore' 截面标准化
+            'rank' cross-sectional percentile rank | 'zscore' cross-sectional standardization
 
         Returns
         -------
         pd.DataFrame
-            与 SignalGenerator.cross_sectional_rank() 输出格式一致
+            Same output format as SignalGenerator.cross_sectional_rank()
         """
         if method == "rank":
             ranked = alpha_df.rank(axis=1, pct=True)

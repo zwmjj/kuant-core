@@ -1,37 +1,37 @@
 """
-Alpaca WebSocket 实时行情流模块
+Alpaca WebSocket real-time market data streaming module
 
-通过 alpaca-py 的 StockDataStream / CryptoDataStream 接收实时
-trades、quotes、bars 数据，并将其缓存在内存 deque 中供实时因子计算使用。
+Receives real-time trades, quotes and bars via alpaca-py's StockDataStream /
+CryptoDataStream and buffers them in in-memory deques for real-time factor computation.
 
-使用示例
+Example
 --------
 >>> import asyncio
 >>> from qf.data_stream import AlpacaStreamManager
 >>>
 >>> mgr = AlpacaStreamManager(buffer_size=500)
 >>>
->>> # 注册回调（可选）
+>>> # Register callbacks (optional)
 >>> mgr.on_bar = lambda data: print(f"[BAR] {data}")
 >>> mgr.on_trade = lambda data: print(f"[TRADE] {data}")
 >>> mgr.on_quote = lambda data: print(f"[QUOTE] {data}")
 >>>
->>> # 订阅股票 bars + trades
+>>> # Subscribe to stock bars + trades
 >>> mgr.subscribe(["AAPL", "TSLA"], data_type="stock_bars")
 >>> mgr.subscribe(["AAPL"], data_type="stock_trades")
 >>>
->>> # 订阅加密货币
+>>> # Subscribe to crypto
 >>> mgr.subscribe(["BTC/USD", "ETH/USD"], data_type="crypto_bars")
 >>>
->>> # 启动（阻塞），也可用 start_background() 在后台线程运行
->>> # mgr.run()            # 阻塞式
->>> mgr.start_background()  # 后台线程
+>>> # Start (blocking); or use start_background() to run in a background thread
+>>> # mgr.run()            # blocking
+>>> mgr.start_background()  # background thread
 >>>
->>> # 查询缓存
+>>> # Query the buffers
 >>> latest = mgr.get_latest("AAPL", "bar")
 >>> buf = mgr.get_buffer("AAPL", n=50, kind="bar")
 >>>
->>> # 取消订阅 & 停止
+>>> # Unsubscribe & stop
 >>> mgr.unsubscribe(["TSLA"], data_type="stock_bars")
 >>> mgr.stop()
 """
@@ -67,20 +67,20 @@ _KIND_MAP = {
 
 class AlpacaStreamManager:
     """
-    Alpaca WebSocket 实时行情管理器
+    Alpaca WebSocket real-time market data manager
 
-    功能:
-      - 订阅 / 取消订阅 股票与加密货币的 trades / quotes / bars
-      - 回调注册：on_bar, on_trade, on_quote
-      - 数据缓存：每个 (symbol, kind) 保存最近 buffer_size 条记录
-      - 断线自动重连（指数退避）
+    Features:
+      - Subscribe / unsubscribe to stock and crypto trades / quotes / bars
+      - Callback registration: on_bar, on_trade, on_quote
+      - Data buffering: keeps the most recent buffer_size records per (symbol, kind)
+      - Automatic reconnection on disconnect (exponential backoff)
 
-    参数:
-      api_key      : Alpaca API Key，默认读环境变量或硬编码
-      secret_key   : Alpaca Secret Key
-      paper        : 是否使用 paper 环境（影响 base_url）
-      buffer_size  : 每个 symbol/kind 缓存条数，默认 1000
-      max_reconnect: 最大重连尝试次数，0 表示无限重试
+    Parameters:
+      api_key      : Alpaca API key; defaults to the environment variable or a hardcoded value
+      secret_key   : Alpaca secret key
+      paper        : Whether to use the paper trading environment (affects base_url)
+      buffer_size  : Number of records buffered per symbol/kind, default 1000
+      max_reconnect: Maximum reconnection attempts; 0 means retry indefinitely
     """
 
     def __init__(
@@ -255,15 +255,15 @@ class AlpacaStreamManager:
 
     def subscribe(self, symbols: List[str], data_type: str = "stock_bars"):
         """
-        订阅实时数据流
+        Subscribe to a real-time data stream
 
-        参数:
-          symbols   : 标的列表，如 ["AAPL", "TSLA"] 或 ["BTC/USD"]
-          data_type : 数据类型，可选值:
+        Parameters:
+          symbols   : List of instruments, e.g. ["AAPL", "TSLA"] or ["BTC/USD"]
+          data_type : Data type, one of:
                       "stock_trades", "stock_quotes", "stock_bars",
                       "crypto_trades", "crypto_bars"
 
-        示例:
+        Example:
           >>> mgr.subscribe(["AAPL", "TSLA"], data_type="stock_bars")
           >>> mgr.subscribe(["BTC/USD"], data_type="crypto_trades")
         """
@@ -294,13 +294,13 @@ class AlpacaStreamManager:
 
     def unsubscribe(self, symbols: List[str], data_type: str = "stock_bars"):
         """
-        取消订阅
+        Unsubscribe from a data stream
 
-        参数:
-          symbols   : 标的列表
-          data_type : 数据类型（同 subscribe）
+        Parameters:
+          symbols   : List of instruments
+          data_type : Data type (same values as subscribe)
 
-        示例:
+        Example:
           >>> mgr.unsubscribe(["TSLA"], data_type="stock_bars")
         """
         if data_type not in ALL_DATA_TYPES:
@@ -335,16 +335,16 @@ class AlpacaStreamManager:
         self, symbol: str, kind: str = "bar"
     ) -> Optional[Dict[str, Any]]:
         """
-        获取某标的最新一条缓存数据
+        Get the most recent buffered record for an instrument
 
-        参数:
-          symbol : 标的代码，如 "AAPL" 或 "BTC/USD"
+        Parameters:
+          symbol : Instrument code, e.g. "AAPL" or "BTC/USD"
           kind   : "trade" / "quote" / "bar"
 
-        返回:
-          dict 或 None（无数据时）
+        Returns:
+          dict, or None when no data is buffered
 
-        示例:
+        Example:
           >>> mgr.get_latest("AAPL", "bar")
           {'symbol': 'AAPL', 'open': 175.2, 'high': 175.5, ...}
         """
@@ -357,17 +357,17 @@ class AlpacaStreamManager:
         self, symbol: str, n: Optional[int] = None, kind: str = "bar"
     ) -> List[Dict[str, Any]]:
         """
-        获取某标的最近 n 条缓存数据
+        Get the most recent n buffered records for an instrument
 
-        参数:
-          symbol : 标的代码
-          n      : 条数，None 返回全部缓存
+        Parameters:
+          symbol : Instrument code
+          n      : Number of records; None returns the entire buffer
           kind   : "trade" / "quote" / "bar"
 
-        返回:
-          list[dict]，按时间升序（最旧在前）
+        Returns:
+          list[dict], in ascending time order (oldest first)
 
-        示例:
+        Example:
           >>> bars = mgr.get_buffer("AAPL", n=50, kind="bar")
           >>> len(bars)
           50
@@ -380,11 +380,11 @@ class AlpacaStreamManager:
         return list(buf)[-n:]
 
     def get_subscriptions(self) -> Dict[str, List[str]]:
-        """返回当前所有订阅 {data_type: [symbols]}"""
+        """Return all current subscriptions as {data_type: [symbols]}"""
         return {k: sorted(v) for k, v in self._subscriptions.items() if v}
 
     def buffer_stats(self) -> Dict[str, int]:
-        """返回每个 (symbol, kind) 的缓存条数统计"""
+        """Return the buffered record count for each (symbol, kind)"""
         return {
             f"{sym}:{kind}": len(buf)
             for (sym, kind), buf in self._buffers.items()
@@ -474,13 +474,13 @@ class AlpacaStreamManager:
 
     def run(self):
         """
-        阻塞式运行所有已订阅的实时流
+        Run all subscribed streams in blocking mode
 
-        适合脚本主入口直接调用。Ctrl+C 可安全退出。
+        Suitable for calling directly from a script entry point. Ctrl+C exits safely.
 
-        示例:
+        Example:
           >>> mgr.subscribe(["AAPL"], data_type="stock_bars")
-          >>> mgr.run()  # 阻塞直到手动停止
+          >>> mgr.run()  # blocks until manually stopped
         """
         self._running = True
         try:
@@ -492,14 +492,15 @@ class AlpacaStreamManager:
 
     def start_background(self):
         """
-        在后台线程中启动实时流（非阻塞）
+        Start the streams in a background thread (non-blocking)
 
-        返回后主线程可继续执行其他逻辑（如策略计算、UI 交互等）。
+        After it returns, the main thread can continue with other work such as
+        strategy computation or UI interaction.
 
-        示例:
+        Example:
           >>> mgr.subscribe(["AAPL"], data_type="stock_bars")
           >>> mgr.start_background()
-          >>> # 主线程继续做其他事...
+          >>> # main thread continues with other work...
           >>> latest = mgr.get_latest("AAPL", "bar")
         """
         if self._running:
@@ -528,9 +529,9 @@ class AlpacaStreamManager:
 
     def stop(self):
         """
-        停止所有实时流
+        Stop all real-time streams
 
-        示例:
+        Example:
           >>> mgr.stop()
         """
         logger.info("正在停止实时数据流...")
@@ -556,13 +557,13 @@ class AlpacaStreamManager:
         logger.info("实时数据流已停止")
 
     def clear_buffers(self):
-        """清空所有缓存数据"""
+        """Clear all buffered data"""
         self._buffers.clear()
         logger.info("所有缓存已清空")
 
     @property
     def is_running(self) -> bool:
-        """流是否正在运行"""
+        """Whether the streams are currently running"""
         return self._running
 
     def __repr__(self):

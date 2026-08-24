@@ -1,7 +1,7 @@
-"""EasyTrader A股实盘交易适配器
+"""EasyTrader A-share live trading adapter
 EasyTrader: https://github.com/shidenggui/easytrader
-支持同花顺、miniQMT 等券商客户端自动下单。
-内置安全机制: dry_run 模式、仓位限制、风控检查。
+Supports automated order placement through broker clients such as Tonghuashun and miniQMT.
+Built-in safeguards: dry_run mode, position limits, risk-control checks.
 """
 import warnings
 import logging
@@ -49,24 +49,24 @@ def init_trader(
     max_total_position_pct: float = 0.95,
     **kwargs,
 ) -> object:
-    """初始化券商交易接口。
+    """Initialize the broker trading interface.
 
     Parameters
     ----------
     broker : str
-        券商类型:
-        - 'tonghuashun' : 同花顺客户端
-        - 'miniqmt'     : miniQMT (迅投)
+        Broker type:
+        - 'tonghuashun' : Tonghuashun client
+        - 'miniqmt'     : miniQMT (XunTou)
     dry_run : bool
-        True = 只打印不下单 (默认开启, 安全第一)
+        True = print orders only, never submit (on by default, safety first)
     max_position_pct : float
-        单只股票最大仓位比例 (0~1)
+        Maximum position weight for a single stock (0~1)
     max_total_position_pct : float
-        总仓位最大比例 (0~1)
+        Maximum total position weight (0~1)
     **kwargs
-        传给 easytrader 的额外参数, 如:
-        - exe_path: 客户端路径
-        - user, password: 登录凭证
+        Extra arguments passed to easytrader, e.g.:
+        - exe_path: path to the client executable
+        - user, password: login credentials
 
     Returns
     -------
@@ -111,12 +111,12 @@ def init_trader(
 
 
 def get_positions() -> pd.DataFrame:
-    """获取当前持仓。
+    """Get current positions.
 
     Returns
     -------
     pd.DataFrame
-        含 code, name, amount, available, cost, market_value, pnl_pct 列
+        With columns code, name, amount, available, cost, market_value, pnl_pct
     """
     if _dry_run or _trader is None:
         logger.info("[DRY RUN] get_positions()")
@@ -146,7 +146,7 @@ def get_positions() -> pd.DataFrame:
 
 
 def get_balance() -> dict:
-    """获取账户资金信息。
+    """Get account cash information.
 
     Returns
     -------
@@ -198,21 +198,21 @@ def _safety_check(
 def execute_orders(
     orders: list,
 ) -> list:
-    """执行订单列表。
+    """Execute a list of orders.
 
     Parameters
     ----------
     orders : list[dict]
-        每个 dict 含:
-        - code: str     股票代码
+        Each dict contains:
+        - code: str     stock code
         - action: str   'buy' | 'sell'
-        - amount: int   股数 (必须为 100 的整数倍)
-        - price: float  委托价格 (0 = 市价)
+        - amount: int   share count (must be a multiple of 100)
+        - price: float  order price (0 = market order)
 
     Returns
     -------
     list[dict]
-        执行结果, 含 status, message 等
+        Execution results, including status, message, etc.
     """
     results = []
 
@@ -309,23 +309,23 @@ def sync_from_signal(
     top_n: int = 20,
     current_prices: pd.Series = None,
 ) -> list:
-    """根据 KQ 信号自动生成并执行调仓订单。
+    """Generate and execute rebalance orders automatically from a KQ signal.
 
     Parameters
     ----------
     signal : pd.Series
-        最新一期截面信号 (stock -> value), 如 signal.iloc[-1]
+        Latest cross-sectional signal (stock -> value), e.g. signal.iloc[-1]
     capital : float
-        目标总资金
+        Target total capital
     top_n : int
-        持仓数量
+        Number of holdings
     current_prices : pd.Series
-        当前价格 (stock -> price)。若为 None, 则只生成订单不执行。
+        Current prices (stock -> price). If None, orders are generated but not executed.
 
     Returns
     -------
     list[dict]
-        订单执行结果
+        Order execution results
     """
     # 选股
     signal_clean = signal.dropna().sort_values(ascending=False)

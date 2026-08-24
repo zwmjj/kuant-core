@@ -1,6 +1,6 @@
-"""AKShare 增强数据适配器 — 免费开源中国金融数据
+"""AKShare enhanced data adapter — free, open-source Chinese financial data
 AKShare: https://github.com/akfamily/akshare
-覆盖股票、基金/ETF、宏观指标、财务报表、指数成分等。
+Covers stocks, funds/ETFs, macro indicators, financial statements, index components, and more.
 """
 import os
 import pickle
@@ -61,23 +61,23 @@ def get_stock_hist(
     period: str = "daily",
     adjust: str = "hfq",
 ) -> pd.DataFrame:
-    """获取个股历史行情 (后复权)。
+    """Fetch single-stock historical bars (back-adjusted).
 
     Parameters
     ----------
     symbol : str
-        股票代码, 如 '000001'
+        Stock code, e.g. '000001'
     start, end : str
-        日期范围, 格式 YYYYMMDD
+        Date range, format YYYYMMDD
     period : str
         'daily', 'weekly', 'monthly'
     adjust : str
-        'hfq' 后复权 | 'qfq' 前复权 | '' 不复权
+        'hfq' back-adjusted | 'qfq' forward-adjusted | '' unadjusted
 
     Returns
     -------
     pd.DataFrame
-        含 日期, 开盘, 收盘, 最高, 最低, 成交量, 成交额, 振幅, 涨跌幅, 换手率
+        With date, open, close, high, low, volume, turnover, amplitude, pct change, turnover rate
     """
     _check_akshare()
     cache_key = f"hist_{symbol}_{start}_{end}_{period}_{adjust}"
@@ -129,18 +129,18 @@ def get_fund_etf_hist(
     period: str = "daily",
     adjust: str = "hfq",
 ) -> pd.DataFrame:
-    """获取场内ETF基金历史行情。
+    """Fetch historical bars for an exchange-traded fund.
 
     Parameters
     ----------
     symbol : str
-        ETF代码, 如 '510300' (沪深300ETF)
+        ETF code, e.g. '510300' (CSI 300 ETF)
     start, end : str
-        日期范围
+        Date range
     period : str
         'daily', 'weekly', 'monthly'
     adjust : str
-        复权类型
+        Adjustment type
 
     Returns
     -------
@@ -184,19 +184,19 @@ def get_fund_etf_hist(
 
 
 def get_macro_data(indicator: str) -> pd.DataFrame:
-    """获取宏观经济指标。
+    """Fetch macroeconomic indicators.
 
     Parameters
     ----------
     indicator : str
-        指标名称:
-        - 'gdp'       : GDP 季度数据
-        - 'cpi'       : CPI 月度数据
-        - 'pmi'       : PMI 月度数据
-        - 'm2'        : M2 货币供应量
-        - 'ppi'       : PPI 月度数据
-        - 'shibor'    : Shibor 利率
-        - 'lpr'       : LPR 利率
+        Indicator name:
+        - 'gdp'       : quarterly GDP
+        - 'cpi'       : monthly CPI
+        - 'pmi'       : monthly PMI
+        - 'm2'        : M2 money supply
+        - 'ppi'       : monthly PPI
+        - 'shibor'    : Shibor rates
+        - 'lpr'       : LPR rates
 
     Returns
     -------
@@ -238,14 +238,14 @@ def get_financial_statements(
     symbol: str,
     period: str = "yearly",
 ) -> dict:
-    """获取财务报表数据 (利润表、资产负债表、现金流量表)。
+    """Fetch financial statement data (income statement, balance sheet, cash flow statement).
 
     Parameters
     ----------
     symbol : str
-        股票代码, 如 '000001'
+        Stock code, e.g. '000001'
     period : str
-        'yearly' 年度 | 'quarterly' 季度
+        'yearly' annual | 'quarterly' quarterly
 
     Returns
     -------
@@ -286,22 +286,22 @@ def get_financial_statements(
 
 
 def get_index_components(index_name: str = "沪深300") -> list:
-    """获取指数成分股列表。
+    """Fetch the constituent list of an index.
 
     Parameters
     ----------
     index_name : str
-        指数名称:
-        - '沪深300' / 'csi300'
-        - '中证500' / 'csi500'
-        - '上证50'  / 'sse50'
-        - '创业板指' / 'chinext'
-        - '科创50'  / 'star50'
+        Index name; the native Chinese index name or its alias:
+        - 'csi300'  : CSI 300
+        - 'csi500'  : CSI 500
+        - 'sse50'   : SSE 50
+        - 'chinext' : ChiNext Index
+        - 'star50'  : STAR 50
 
     Returns
     -------
     list[str]
-        成分股代码列表
+        List of constituent stock codes
     """
     _check_akshare()
     name_map = {

@@ -1,17 +1,17 @@
-"""高级Alpha因子库 — 利用Alpaca微观结构/日内模式/波动率等未开发数据源"""
+"""Advanced alpha factor library - exploits under-used Alpaca data: microstructure, intraday patterns and volatility"""
 import numpy as np
 import pandas as pd
 
 
 class AdvancedSignalGenerator:
-    """高级因子信号的静态方法集合
+    """A collection of static methods producing advanced factor signals.
 
-    所有输入均为 pandas DataFrame，index=日期，columns=股票代码。
-    所有信号输出均经过 cross_rank 处理，值域 [-1, 1]。
+    Every input is a pandas DataFrame indexed by date with tickers as columns.
+    Every output signal is passed through cross_rank and lies in [-1, 1].
 
-    data_dict 结构:
+    Structure of data_dict:
         close, open, high, low, volume, trade_count, vwap,
-        spy (SPY收盘价 Series), sector_returns (可选 DataFrame)
+        spy (Series of SPY closes), sector_returns (optional DataFrame)
     """
 
     # ═══════════════════════════════════════════════════════
@@ -20,7 +20,7 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def cross_rank(signal):
-        """截面排名，映射到 [-1, 1]"""
+        """Cross-sectional rank, mapped onto [-1, 1]."""
         def _rank_row(row):
             valid = row.dropna()
             if len(valid) < 10:
@@ -34,10 +34,11 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def kyle_lambda(returns, volume, window=20):
-        """Kyle Lambda — 价格冲击系数
+        """Kyle's lambda - the price-impact coefficient.
 
-        对 |returns| 与 volume 做滚动回归，斜率即为 lambda。
-        高 lambda = 流动性差。信号取负值，偏好流动性好的标的。
+        Rolling regression of |returns| on volume; the slope is lambda.
+        A high lambda means poor liquidity, so the signal is negated to
+        favour liquid names.
         """
         abs_ret = returns.abs()
 
@@ -68,12 +69,12 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def order_flow_imbalance(close, high, low, volume, window=10):
-        """订单流失衡 (OFI)
+        """Order flow imbalance (OFI).
 
-        买量估计 = volume * (close - low) / (high - low)
-        卖量估计 = volume - buy_vol
+        Estimated buy volume  = volume * (close - low) / (high - low)
+        Estimated sell volume = volume - buy_vol
         OFI = rolling_sum(buy_vol - sell_vol)
-        正值 = 买压主导
+        Positive values indicate buying pressure dominates.
         """
         hl_range = (high - low).replace(0, np.nan)
         buy_ratio = (close - low) / hl_range
@@ -85,10 +86,10 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def realized_spread(high, low, close, window=20):
-        """实现价差指标
+        """Realized-spread indicator.
 
-        (2*close - high - low) / close 的滚动均值。
-        正值 = 收盘偏向最高价 = 看涨倾向。
+        Rolling mean of (2*close - high - low) / close.
+        Positive values mean the close sits near the high, which reads bullish.
         """
         raw = (2 * close - high - low) / close
         smoothed = raw.rolling(window).mean()
@@ -96,10 +97,12 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def tick_size_clustering(close, window=20):
-        """价格聚集度 — 散户行为代理
+        """Price clustering - a proxy for retail behaviour.
 
-        统计过去window日中收盘价落在整数($X.00)或半整数($X.50)的比例。
-        高聚集度 = 散户主导（散户偏好整数报价）。信号取负值。
+        Fraction of the last `window` days whose close landed on a round
+        ($X.00) or half-round ($X.50) price. Heavy clustering indicates retail
+        dominance, since retail traders favour round quotes, so the signal is
+        negated.
         """
         remainder = close % 1.0
         is_round = ((remainder < 0.02) | (remainder > 0.98) |
@@ -115,11 +118,12 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def overnight_return(open_prices, prev_close):
-        """隔夜收益 — 机构定价信号
+        """Overnight return - an institutional pricing signal.
 
         overnight = open / prev_close - 1
-        累计隔夜收益持续性强 = 机构在盘后/盘前建仓。
-        prev_close 可传入 close.shift(1)。
+        Persistent cumulative overnight returns indicate institutions building
+        positions after hours or pre-market.
+        prev_close may be passed as close.shift(1).
         """
         raw = open_prices / prev_close - 1
         cum_on = raw.rolling(20).sum()
@@ -127,10 +131,10 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def intraday_return(close, open_prices):
-        """日内收益 — 散户动量
+        """Intraday return - retail momentum.
 
         intraday = close / open - 1
-        累计日内收益 = 散户资金流向。
+        Cumulative intraday returns track retail flow.
         """
         raw = close / open_prices - 1
         cum_id = raw.rolling(20).sum()
@@ -138,10 +142,11 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def overnight_intraday_divergence(open_prices, close):
-        """隔夜-日内背离因子
+        """Overnight-versus-intraday divergence factor.
 
-        当隔夜收益与日内收益方向相反时，跟随隔夜方向（更聪明的钱）。
-        信号 = overnight_ret - intraday_ret（滚动求和）。
+        When the overnight and intraday returns disagree in sign, follow the
+        overnight direction as the better-informed flow.
+        Signal = rolling sum of (overnight_ret - intraday_ret).
         """
         prev_close = close.shift(1)
         on_ret = open_prices / prev_close - 1
@@ -155,10 +160,11 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def volume_autocorrelation(volume, window=20):
-        """成交量自相关 — 机构执行计划检测
+        """Volume autocorrelation - detects scheduled institutional execution.
 
-        滚动成交量与lag-1的相关系数。
-        高自相关 = 机构按计划执行大单（TWAP/VWAP算法）。
+        Rolling correlation between volume and its lag-1 value.
+        High autocorrelation suggests institutions working a large order to a
+        schedule (TWAP/VWAP algorithms).
         """
         vol_lag = volume.shift(1)
         corr = volume.rolling(window).corr(vol_lag)
@@ -166,21 +172,21 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def price_volume_correlation(returns, volume, window=20):
-        """量价相关性
+        """Price-volume correlation.
 
-        正相关 = 趋势确认（放量上涨或放量下跌）。
-        负相关 = 量价背离 = 潜在反转。
-        信号直接用相关系数。
+        Positive correlation confirms a trend (rising or falling on heavy volume).
+        Negative correlation is a price-volume divergence and a possible reversal.
+        The correlation coefficient is used directly as the signal.
         """
         corr = returns.rolling(window).corr(volume)
         return AdvancedSignalGenerator.cross_rank(corr)
 
     @staticmethod
     def abnormal_volume_return(returns, volume, window=20):
-        """异常成交量日收益 — 捕捉"聪明钱"信号
+        """Returns on abnormal-volume days - a smart-money signal.
 
-        异常成交量 = volume > 2 * rolling_mean(volume)
-        只保留异常日收益，其余置零，然后累计。
+        A day is abnormal when volume > 2 * rolling_mean(volume).
+        Returns on non-abnormal days are zeroed out and the rest accumulated.
         """
         vol_ma = volume.rolling(window).mean()
         is_abnormal = volume > (2 * vol_ma)
@@ -194,11 +200,11 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def garman_klass_vol(open_prices, high, low, close, window=20):
-        """Garman-Klass 波动率估计
+        """Garman-Klass volatility estimator.
 
         GK = 0.5*ln(H/L)^2 - (2ln2-1)*ln(C/O)^2
-        比收盘价波动率更准确，利用了OHLC全部信息。
-        信号取负值（低波动率溢价）。
+        More efficient than close-to-close volatility because it uses the full
+        OHLC bar. The signal is negated to capture the low-volatility premium.
         """
         log_hl = np.log(high / low)
         log_co = np.log(close / open_prices)
@@ -209,11 +215,11 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def parkinson_vol(high, low, window=20):
-        """Parkinson 波动率 — 基于日内极差
+        """Parkinson volatility - estimated from the intraday high-low range.
 
         PV = sqrt(1/(4*N*ln2) * sum(ln(H/L)^2))
-        捕捉日内波动率，收盘价波动率会遗漏这部分信息。
-        信号取负值。
+        Captures intraday variation that close-to-close volatility misses.
+        The signal is negated.
         """
         log_hl_sq = np.log(high / low) ** 2
         pv = np.sqrt(log_hl_sq.rolling(window).mean() / (4 * np.log(2)))
@@ -222,10 +228,11 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def vol_of_vol(returns, inner=10, outer=60):
-        """波动率的波动率 (VoV)
+        """Volatility of volatility (VoV).
 
-        先算inner窗口的滚动波动率，再算outer窗口的波动率标准差。
-        高VoV = 不确定性大 = 看空信号。
+        Computes rolling volatility over the inner window, then the standard
+        deviation of that series over the outer window.
+        High VoV means elevated uncertainty and reads as bearish.
         """
         inner_vol = returns.rolling(inner).std()
         vov = inner_vol.rolling(outer).std()
@@ -234,10 +241,11 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def range_expansion(high, low, close, window=20):
-        """波幅扩张因子
+        """Range-expansion factor.
 
-        当日波幅 / 20日平均波幅。
-        波幅扩张 = 突破信号。结合方向（收盘偏向）给出方向性信号。
+        Today's range divided by the 20-day average range.
+        An expanding range signals a breakout; combining it with direction
+        (where the close sits in the bar) yields a directional signal.
         """
         daily_range = high - low
         avg_range = daily_range.rolling(window).mean()
@@ -254,10 +262,10 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def relative_strength_vs_spy(returns, spy_returns, window=20):
-        """相对SPY强度 — 纯个股alpha动量
+        """Relative strength versus SPY - pure single-name alpha momentum.
 
-        滚动alpha = cumulative(stock_ret - spy_ret)
-        去除市场beta后的纯超额收益动量。
+        Rolling alpha = cumulative(stock_ret - spy_ret)
+        Momentum in excess return once market beta is stripped out.
         """
         # spy_returns 是 Series，广播到 DataFrame
         excess = returns.sub(spy_returns, axis=0)
@@ -266,10 +274,10 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def beta_adjusted_momentum(returns, spy_returns, window=60):
-        """Beta调整动量 — 残差动量
+        """Beta-adjusted momentum - residual momentum.
 
-        先估计滚动beta，再取残差收益的累计值。
-        残差动量比原始动量有更强的预测力。
+        Estimates a rolling beta, then accumulates the residual returns.
+        Residual momentum predicts better than raw momentum.
         """
         result = pd.DataFrame(np.nan, index=returns.index, columns=returns.columns)
         for col in returns.columns:
@@ -292,11 +300,12 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def sector_relative_strength(returns, sector_returns, window=20):
-        """板块相对强度
+        """Sector-relative strength.
 
-        stock_ret - sector_ret 的滚动累计。
-        剥离行业beta，捕捉行业内alpha。
-        sector_returns: DataFrame，与returns同结构（每列对应该股票所属板块ETF收益）。
+        Rolling accumulation of (stock_ret - sector_ret), which removes sector
+        beta and isolates within-sector alpha.
+        sector_returns: DataFrame shaped like returns, each column carrying the
+        return of the sector ETF that stock belongs to.
         """
         excess = returns - sector_returns
         rolling_rs = excess.rolling(window).sum()
@@ -308,18 +317,18 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def prepare_advanced_signals(data_dict):
-        """计算全部高级因子，返回 dict[str, DataFrame]
+        """Compute every advanced factor and return them as dict[str, DataFrame].
 
         Parameters
         ----------
         data_dict : dict
-            必须包含: close, open, high, low, volume
-            可选: trade_count, vwap, spy (SPY收盘价 Series),
+            Required: close, open, high, low, volume
+            Optional: trade_count, vwap, spy (Series of SPY closes),
                   sector_returns (DataFrame)
 
         Returns
         -------
-        dict[str, DataFrame] — 每个因子名对应一个 cross_rank 后的 DataFrame
+        dict[str, DataFrame] - one cross_rank-ed DataFrame per factor name
         """
         G = AdvancedSignalGenerator
         close = data_dict['close']
@@ -371,17 +380,17 @@ class AdvancedSignalGenerator:
 
     @staticmethod
     def build_advanced_signal(data_dict, weights=None):
-        """加权组合全部高级因子，输出综合信号 DataFrame
+        """Blend every advanced factor by weight into a single composite signal.
 
         Parameters
         ----------
-        data_dict : dict — 同 prepare_advanced_signals
+        data_dict : dict - as for prepare_advanced_signals
         weights : dict[str, float] | None
-            因子名 -> 权重。None 则等权。
+            Factor name -> weight. None means equal weights.
 
         Returns
         -------
-        DataFrame — 综合信号，值域 [-1, 1]
+        DataFrame - composite signal in [-1, 1]
         """
         G = AdvancedSignalGenerator
         signals = G.prepare_advanced_signals(data_dict)

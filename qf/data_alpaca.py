@@ -1,4 +1,4 @@
-"""Alpaca数据集成 — alpaca-py SDK + 缓存"""
+"""Alpaca data integration — alpaca-py SDK + caching"""
 import os, pickle, warnings, time
 import pandas as pd
 import numpy as np
@@ -12,7 +12,7 @@ _DEFAULT_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY", "")
 
 
 class AlpacaDataLoader:
-    """Alpaca数据加载器 — 股票/加密/期权/新闻/筛选"""
+    """Alpaca data loader — stocks / crypto / options / news / screener"""
 
     def __init__(self, api_key=None, secret_key=None, paper=True):
         self.api_key = api_key or _DEFAULT_API_KEY
@@ -82,7 +82,7 @@ class AlpacaDataLoader:
 
     @property
     def trading_client(self):
-        """交易客户端 — 用于获取可交易资产列表"""
+        """Trading client — used to fetch the list of tradable assets"""
         if self._trading_client is None:
             from alpaca.trading.client import TradingClient
             self._trading_client = TradingClient(
@@ -156,12 +156,12 @@ class AlpacaDataLoader:
     # ── 1. 日K线 ────────────────────────────────────────────
 
     def get_daily_bars(self, symbols, start, end):
-        """获取日K线 — OHLCV+vwap+trade_count
+        """Fetch daily bars — OHLCV + vwap + trade_count
 
         Parameters:
-            symbols: str或list — 股票代码
-            start: str或datetime — 开始日期
-            end: str或datetime — 结束日期
+            symbols: str or list — ticker symbols
+            start: str or datetime — start date
+            end: str or datetime — end date
 
         Returns:
             DataFrame with MultiIndex (symbol, timestamp)
@@ -196,7 +196,7 @@ class AlpacaDataLoader:
     # ── 2. 分钟K线 ──────────────────────────────────────────
 
     def get_minute_bars(self, symbols, start, end):
-        """获取分钟K线"""
+        """Fetch minute bars"""
         symbols = self._ensure_list(symbols)
         cache_key = f"min_{'_'.join(sorted(symbols))}_{start}_{end}"
         cached = self._load_cache(cache_key, max_age_seconds=3600)
@@ -227,7 +227,7 @@ class AlpacaDataLoader:
     # ── 3. 小时K线 ──────────────────────────────────────────
 
     def get_hourly_bars(self, symbols, start, end):
-        """获取小时K线"""
+        """Fetch hourly bars"""
         symbols = self._ensure_list(symbols)
         cache_key = f"hour_{'_'.join(sorted(symbols))}_{start}_{end}"
         cached = self._load_cache(cache_key, max_age_seconds=3600)
@@ -258,7 +258,7 @@ class AlpacaDataLoader:
     # ── 4. 实时快照 ─────────────────────────────────────────
 
     def get_snapshots(self, symbols):
-        """获取实时快照 — bid/ask/last/daily_bar
+        """Fetch real-time snapshots — bid/ask/last/daily_bar
 
         Returns:
             dict: {symbol: {bid, ask, last, daily_bar: {...}}}
@@ -305,7 +305,7 @@ class AlpacaDataLoader:
     # ── 5. 逐笔成交 ─────────────────────────────────────────
 
     def get_trades(self, symbol, start, end, limit=1000):
-        """获取逐笔成交数据
+        """Fetch tick-level trade data
 
         Returns:
             DataFrame with columns: price, size, exchange, conditions, timestamp
@@ -332,7 +332,7 @@ class AlpacaDataLoader:
     # ── 6. 新闻 ─────────────────────────────────────────────
 
     def get_news(self, symbols=None, limit=50):
-        """获取新闻
+        """Fetch news
 
         Returns:
             list of dicts: headline, created_at, source, symbols, url, summary
@@ -378,7 +378,7 @@ class AlpacaDataLoader:
     # ── 7. 期权链 ────────────────────────────────────────────
 
     def get_option_chain(self, underlying):
-        """获取期权链
+        """Fetch the option chain
 
         Returns:
             DataFrame: strike, expiry, type (call/put), bid, ask, mid, iv_proxy
@@ -449,10 +449,10 @@ class AlpacaDataLoader:
     # ── 8. 加密货币K线 ──────────────────────────────────────
 
     def get_crypto_bars(self, symbols, start, end, timeframe='day'):
-        """获取加密货币K线
+        """Fetch crypto bars
 
         Parameters:
-            symbols: 如 'BTC/USD' 或 ['BTC/USD', 'ETH/USD']
+            symbols: e.g. 'BTC/USD' or ['BTC/USD', 'ETH/USD']
             timeframe: 'day', 'hour', 'minute'
         """
         symbols = self._ensure_list(symbols)
@@ -493,24 +493,24 @@ class AlpacaDataLoader:
 
     def get_crypto_ohlcv(self, symbols=None, start="2024-01-01", end="2026-03-31",
                          timeframe="1Day"):
-        """获取加密货币日线OHLCV数据，按币种拆分返回
+        """Fetch daily crypto OHLCV data, returned split by symbol
 
-        与 get_crypto_bars 的区别：本方法返回 dict[str, DataFrame]，
-        每个 symbol 一个独立的 DataFrame，列为标准 OHLCV，便于策略直接使用。
+        Difference from get_crypto_bars: this method returns dict[str, DataFrame],
+        one standalone DataFrame per symbol with standard OHLCV columns, ready for direct use in strategies.
 
         Parameters:
-            symbols : str, list 或 None
-                加密货币交易对，如 'BTC/USD' 或 ['BTC/USD', 'ETH/USD', 'SOL/USD']。
-                默认为 ['BTC/USD', 'ETH/USD', 'SOL/USD']。
-            start : str 或 datetime — 开始日期
-            end   : str 或 datetime — 结束日期
-            timeframe : str — K线周期，支持 '1Day', '1Hour', '1Min'
+            symbols : str, list or None
+                Crypto trading pairs, e.g. 'BTC/USD' or ['BTC/USD', 'ETH/USD', 'SOL/USD'].
+                Defaults to ['BTC/USD', 'ETH/USD', 'SOL/USD'].
+            start : str or datetime — start date
+            end   : str or datetime — end date
+            timeframe : str — bar interval; supports '1Day', '1Hour', '1Min'
 
         Returns:
             dict[str, pd.DataFrame]
-                键为 symbol（如 'BTC/USD'），值为 DataFrame，
-                列: open, high, low, close, volume, vwap, trade_count
-                索引: DatetimeIndex (timestamp)
+                Keys are symbols (e.g. 'BTC/USD'), values are DataFrames with
+                columns: open, high, low, close, volume, vwap, trade_count
+                index: DatetimeIndex (timestamp)
         """
         # 默认三大主流币
         if symbols is None:
@@ -595,7 +595,7 @@ class AlpacaDataLoader:
     # ── 9. 最活跃股票 ───────────────────────────────────────
 
     def get_most_actives(self, top=20):
-        """获取最活跃股票
+        """Fetch the most active stocks
 
         Returns:
             DataFrame: symbol, volume, trade_count
@@ -626,7 +626,7 @@ class AlpacaDataLoader:
     # ── 10. 涨跌幅排行 ──────────────────────────────────────
 
     def get_market_movers(self, top=10):
-        """获取涨跌幅排行
+        """Fetch the top market movers
 
         Returns:
             dict: {'gainers': DataFrame, 'losers': DataFrame}
@@ -665,7 +665,7 @@ class AlpacaDataLoader:
     # ── 11. 可交易宇宙 ──────────────────────────────────────
 
     def get_universe(self, min_price=5, min_volume=100000):
-        """获取可交易股票宇宙 — 按最低价格和成交量过滤
+        """Fetch the tradable stock universe — filtered by minimum price and volume
 
         Returns:
             list of symbol strings
@@ -723,11 +723,11 @@ class AlpacaDataLoader:
     # ── 12. prepare_alpaca_data — 类似WRDS的prepare_data ────
 
     def prepare_alpaca_data(self, symbols=None, lookback_days=252):
-        """准备Alpaca数据集 — 类似WRDS prepare_data
+        """Prepare an Alpaca dataset — analogous to the WRDS prepare_data
 
         Parameters:
-            symbols: list或None — 指定股票列表，None则使用最活跃股票
-            lookback_days: int — 回溯天数
+            symbols: list or None — explicit ticker list; None uses the most active stocks
+            lookback_days: int — number of days to look back
 
         Returns:
             dict: prices, returns, volume, vwap, trade_count, high, low
@@ -838,7 +838,7 @@ class AlpacaDataLoader:
     # ── 13. 逐笔报价历史 ────────────────────────────────────────
 
     def get_stock_quotes(self, symbols, start, end, limit=10000):
-        """获取历史逐笔报价 (bid/ask)
+        """Fetch historical tick-level quotes (bid/ask)
 
         Returns:
             DataFrame: bid_price, bid_size, bid_exchange, ask_price, ask_size, ask_exchange, conditions, tape
@@ -864,7 +864,7 @@ class AlpacaDataLoader:
     # ── 14. 最新单条数据 ────────────────────────────────────────
 
     def get_latest_bars(self, symbols):
-        """获取最新单条K线"""
+        """Fetch the latest single bar"""
         symbols = self._ensure_list(symbols)
         try:
             from alpaca.data.requests import StockLatestBarRequest
@@ -884,7 +884,7 @@ class AlpacaDataLoader:
             return {}
 
     def get_latest_quotes(self, symbols):
-        """获取最新报价 (bid/ask)"""
+        """Fetch the latest quotes (bid/ask)"""
         symbols = self._ensure_list(symbols)
         try:
             from alpaca.data.requests import StockLatestQuoteRequest
@@ -906,7 +906,7 @@ class AlpacaDataLoader:
             return {}
 
     def get_latest_trades(self, symbols):
-        """获取最新成交"""
+        """Fetch the latest trades"""
         symbols = self._ensure_list(symbols)
         try:
             from alpaca.data.requests import StockLatestTradeRequest
@@ -928,7 +928,7 @@ class AlpacaDataLoader:
     # ── 15. 加密货币订单簿 (L2) ────────────────────────────────
 
     def get_crypto_orderbook(self, symbols):
-        """获取加密货币L2订单簿
+        """Fetch the crypto L2 order book
 
         Returns:
             dict: {symbol: {'bids': [(price, size), ...], 'asks': [(price, size), ...]}}
@@ -954,7 +954,7 @@ class AlpacaDataLoader:
     # ── 16. 加密货币报价历史 ───────────────────────────────────
 
     def get_crypto_quotes(self, symbols, start, end, limit=10000):
-        """获取加密货币逐笔报价"""
+        """Fetch tick-level crypto quotes"""
         symbols = self._ensure_list(symbols)
         try:
             from alpaca.data.requests import CryptoQuoteRequest
@@ -975,7 +975,7 @@ class AlpacaDataLoader:
     # ── 17. 加密货币最新数据 ───────────────────────────────────
 
     def get_crypto_latest(self, symbols):
-        """获取加密货币最新bar/quote/trade"""
+        """Fetch the latest crypto bar/quote/trade"""
         symbols = self._ensure_list(symbols)
         out = {}
         try:
@@ -1012,7 +1012,7 @@ class AlpacaDataLoader:
     # ── 18. 加密货币逐笔成交 ──────────────────────────────────
 
     def get_crypto_trades(self, symbols, start, end, limit=10000):
-        """获取加密货币逐笔成交"""
+        """Fetch tick-level crypto trades"""
         symbols = self._ensure_list(symbols)
         try:
             from alpaca.data.requests import CryptoTradesRequest
@@ -1033,7 +1033,7 @@ class AlpacaDataLoader:
     # ── 19. 加密货币快照 ──────────────────────────────────────
 
     def get_crypto_snapshots(self, symbols):
-        """获取加密货币实时快照"""
+        """Fetch real-time crypto snapshots"""
         symbols = self._ensure_list(symbols)
         try:
             from alpaca.data.requests import CryptoSnapshotRequest
@@ -1062,10 +1062,10 @@ class AlpacaDataLoader:
     # ── 20. 期权K线 ──────────────────────────────────────────
 
     def get_option_bars(self, symbols, start, end, timeframe='day'):
-        """获取期权合约K线
+        """Fetch bars for an option contract
 
         Parameters:
-            symbols: 期权合约代码, 如 'AAPL260424C00250000'
+            symbols: option contract symbol, e.g. 'AAPL260424C00250000'
         """
         symbols = self._ensure_list(symbols)
         try:
@@ -1089,7 +1089,7 @@ class AlpacaDataLoader:
     # ── 21. 期权逐笔成交 ────────────────────────────────────
 
     def get_option_trades(self, symbols, start, end, limit=10000):
-        """获取期权逐笔成交"""
+        """Fetch tick-level option trades"""
         symbols = self._ensure_list(symbols)
         try:
             from alpaca.data.requests import OptionTradesRequest
@@ -1110,7 +1110,7 @@ class AlpacaDataLoader:
     # ── 22. 期权最新报价/成交/快照 ──────────────────────────
 
     def get_option_latest_quote(self, symbols):
-        """获取期权最新报价"""
+        """Fetch the latest option quotes"""
         symbols = self._ensure_list(symbols)
         try:
             from alpaca.data.requests import OptionLatestQuoteRequest
@@ -1126,7 +1126,7 @@ class AlpacaDataLoader:
             return {}
 
     def get_option_latest_trade(self, symbols):
-        """获取期权最新成交"""
+        """Fetch the latest option trades"""
         symbols = self._ensure_list(symbols)
         try:
             from alpaca.data.requests import OptionLatestTradeRequest
@@ -1143,7 +1143,7 @@ class AlpacaDataLoader:
             return {}
 
     def get_option_snapshot(self, symbols):
-        """获取期权合约快照"""
+        """Fetch option contract snapshots"""
         symbols = self._ensure_list(symbols)
         try:
             from alpaca.data.requests import OptionSnapshotRequest
@@ -1176,7 +1176,7 @@ class AlpacaDataLoader:
     # ── 23. 期权交易所代码 ──────────────────────────────────
 
     def get_option_exchanges(self):
-        """获取期权交易所代码映射"""
+        """Fetch the option exchange code mapping"""
         try:
             codes = self.option_client.get_option_exchange_codes()
             return dict(codes)
@@ -1187,11 +1187,11 @@ class AlpacaDataLoader:
     # ── 24. 公司行动 (股息/拆股/合并) ──────────────────────
 
     def get_corporate_actions(self, ca_type='dividend', since=None, until=None):
-        """获取公司行动数据
+        """Fetch corporate action data
 
         Parameters:
             ca_type: 'dividend'|'split'|'merger'|'spinoff'|'rights_distribution'
-            since/until: date对象
+            since/until: date objects
 
         Returns:
             DataFrame: target_symbol, ca_type, cash, new_rate, old_rate,
@@ -1259,7 +1259,7 @@ class AlpacaDataLoader:
     # ── 25. 期权合约详情 ────────────────────────────────────
 
     def get_option_contracts(self, underlying, expiration_gte=None, expiration_lte=None):
-        """获取期权合约元数据 (strike, OI, style, status)
+        """Fetch option contract metadata (strike, OI, style, status)
 
         Returns:
             DataFrame: symbol, name, strike_price, expiration_date, type, style,
@@ -1307,7 +1307,7 @@ class AlpacaDataLoader:
     # ── 26. 投资组合历史 ────────────────────────────────────
 
     def get_portfolio_history(self, period='1M', timeframe='1D'):
-        """获取投资组合历史 (equity/P&L曲线)
+        """Fetch portfolio history (equity / P&L curve)
 
         Parameters:
             period: '1D','1W','1M','3M','6M','1A','all'
@@ -1337,7 +1337,7 @@ class AlpacaDataLoader:
     # ── 27. 市场时钟 ────────────────────────────────────────
 
     def get_clock(self):
-        """获取市场时钟
+        """Fetch the market clock
 
         Returns:
             dict: is_open, timestamp, next_open, next_close
@@ -1357,7 +1357,7 @@ class AlpacaDataLoader:
     # ── 28. 交易日历 ────────────────────────────────────────
 
     def get_calendar(self, start, end):
-        """获取交易日历
+        """Fetch the trading calendar
 
         Returns:
             DataFrame: date, open, close, settlement_date
@@ -1391,7 +1391,7 @@ class AlpacaDataLoader:
     # ── 29. 完整资产数据库 ──────────────────────────────────
 
     def get_all_assets(self, asset_class='us_equity'):
-        """获取完整资产数据库
+        """Fetch the complete asset database
 
         Returns:
             DataFrame: symbol, name, exchange, asset_class, status,
@@ -1436,10 +1436,10 @@ class AlpacaDataLoader:
     # ── 30. 账户详情 ────────────────────────────────────────
 
     def get_account(self):
-        """获取账户完整信息
+        """Fetch full account information
 
         Returns:
-            dict: equity, cash, buying_power, portfolio_value, 等
+            dict: equity, cash, buying_power, portfolio_value, etc.
         """
         try:
             acct = self.trading_client.get_account()
@@ -1467,7 +1467,7 @@ class AlpacaDataLoader:
     # ── 31. 持仓查询 ───────────────────────────────────────
 
     def get_positions(self):
-        """获取当前所有持仓
+        """Fetch all current positions
 
         Returns:
             DataFrame: symbol, qty, side, market_value, cost_basis,
@@ -1497,7 +1497,7 @@ class AlpacaDataLoader:
     # ── 32. 订单查询 ───────────────────────────────────────
 
     def get_orders(self, status='all', limit=100):
-        """获取历史订单
+        """Fetch historical orders
 
         Returns:
             DataFrame: symbol, side, qty, type, status, filled_qty,
@@ -1536,7 +1536,7 @@ class AlpacaDataLoader:
 # ── 便捷函数 ──────────────────────────────────────────────────
 
 def prepare_alpaca_data(symbols=None, lookback_days=252):
-    """模块级便捷函数 — 直接调用"""
+    """Module-level convenience function — call directly"""
     loader = AlpacaDataLoader()
     return loader.prepare_alpaca_data(symbols=symbols, lookback_days=lookback_days)
 

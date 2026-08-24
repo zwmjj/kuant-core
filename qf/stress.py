@@ -1,11 +1,11 @@
-"""压力测试 + 情景分析"""
+"""Stress testing and scenario analysis."""
 import numpy as np
 import pandas as pd
 from qf.backtest import run_event_driven
 
 
 class StressTest:
-    """可插拔压力测试套件"""
+    """Pluggable stress test suite."""
     def __init__(self, d, signal, base_kw=None):
         self.d = d
         self.signal = signal
@@ -18,7 +18,7 @@ class StressTest:
         return r, m
 
     def crisis_replay(self, crises=None):
-        """历史危机回放"""
+        """Replay historical crisis periods."""
         if crises is None:
             crises = [
                 ('Dot-Com Crash',       '2000-03', '2002-10'),
@@ -52,7 +52,7 @@ class StressTest:
         return pd.DataFrame(results)
 
     def synthetic_shocks(self):
-        """合成压力场景"""
+        """Synthetic stress scenarios."""
         r, _ = self._run()
         rets = r.returns
         results = []
@@ -75,7 +75,7 @@ class StressTest:
         return pd.DataFrame(results)
 
     def parameter_sensitivity(self, param_grid=None):
-        """参数扰动测试"""
+        """Parameter perturbation test."""
         if param_grid is None:
             param_grid = [
                 ('Baseline L20/S20', {}),
@@ -94,7 +94,7 @@ class StressTest:
         return pd.DataFrame(results)
 
     def cost_sensitivity(self, cost_levels=None):
-        """交易成本压力测试"""
+        """Transaction cost stress test."""
         if cost_levels is None:
             cost_levels = [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
         results = []
@@ -105,7 +105,7 @@ class StressTest:
         return pd.DataFrame(results)
 
     def triple_cost_scenario(self):
-        """3x成本场景 (SOP Phase 3 要求)"""
+        """3x cost scenario (required by SOP Phase 3)."""
         base = self.base_kw.copy()
         triple_kw = {
             'commission_bps': base.get('commission_bps', 1.0) * 3,
