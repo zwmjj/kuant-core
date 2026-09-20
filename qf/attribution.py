@@ -1,4 +1,4 @@
-"""因子归因分析"""
+"""Factor attribution analysis."""
 import numpy as np
 import pandas as pd
 

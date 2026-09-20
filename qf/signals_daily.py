@@ -1,20 +1,20 @@
-"""日频因子信号库 — 基于Alpaca日线OHLCV+VWAP+trade_count数据"""
+"""Daily factor signal library — built on Alpaca daily OHLCV + VWAP + trade_count data"""
 import numpy as np
 import pandas as pd
 
 
 class DailySignalGenerator:
-    """日频因子信号的静态方法集合
+    """Collection of static methods for daily factor signals
 
-    所有输入均为 pandas DataFrame，index=日期，columns=股票代码。
-    所有信号输出均经过 cross_sectional_rank 处理，值域 [-1, 1]。
+    All inputs are pandas DataFrames with index=date, columns=stock code.
+    All signal outputs pass through cross_sectional_rank and are bounded to [-1, 1].
     """
 
     # ── 工具 ──
 
     @staticmethod
     def cross_sectional_rank(signal):
-        """截面排名，映射到 [-1, 1]"""
+        """Cross-sectional rank mapped to [-1, 1]"""
         def rank_row(row):
             valid = row.dropna()
             if len(valid) < 10:
@@ -26,24 +26,24 @@ class DailySignalGenerator:
 
     @staticmethod
     def momentum_5d(prices):
-        """5日价格动量 — 短期趋势跟随
-        (price / price_5d_ago) - 1，截面排名后输出
+        """5-day price momentum — short-term trend following
+        (price / price_5d_ago) - 1, output after cross-sectional ranking
         """
         raw = prices / prices.shift(5) - 1
         return DailySignalGenerator.cross_sectional_rank(raw)
 
     @staticmethod
     def momentum_20d(prices):
-        """20日（约1个月）价格动量 — 中短期趋势
-        (price / price_20d_ago) - 1，截面排名后输出
+        """20-day (roughly one month) price momentum — medium-short-term trend
+        (price / price_20d_ago) - 1, output after cross-sectional ranking
         """
         raw = prices / prices.shift(20) - 1
         return DailySignalGenerator.cross_sectional_rank(raw)
 
     @staticmethod
     def momentum_reversal_5d(returns):
-        """5日反转信号 — 逆势因子
-        过去5日累计收益的负值（短期超卖反弹逻辑）
+        """5-day reversal signal — contrarian factor
+        Negative of the past 5-day cumulative return (short-term oversold bounce logic)
         """
         cum_5d = returns.rolling(5).sum()
         raw = -cum_5d
@@ -53,8 +53,8 @@ class DailySignalGenerator:
 
     @staticmethod
     def volume_surge(volume, lookback=20):
-        """成交量突增 — 今日成交量 / 20日均量
-        高量突增往往预示趋势变化或机构介入
+        """Volume surge — today's volume / 20-day average volume
+        A volume spike often precedes a trend change or institutional participation
         """
         avg_vol = volume.rolling(lookback).mean()
         raw = volume / avg_vol.replace(0, np.nan)
@@ -62,17 +62,17 @@ class DailySignalGenerator:
 
     @staticmethod
     def dollar_volume_rank(volume, prices):
-        """美元成交额排名 — 流动性信号
-        volume × close，高流动性通常与机构关注度正相关
+        """Dollar volume rank — liquidity signal
+        volume x close; high liquidity is generally positively correlated with institutional attention
         """
         dollar_vol = volume * prices
         return DailySignalGenerator.cross_sectional_rank(dollar_vol)
 
     @staticmethod
     def volume_price_trend(prices, volume):
-        """量价趋势 (OBV-style) — 累计方向成交量
-        price上涨日累加volume，下跌日累减，衡量买卖力量平衡
-        取20日滚动累计避免无限累加
+        """Volume-price trend (OBV-style) — cumulative signed volume
+        Adds volume on up days and subtracts it on down days to measure the balance of buying
+        and selling pressure. Uses a 20-day rolling sum to avoid unbounded accumulation.
         """
         price_chg = prices.diff()
         direction = np.sign(price_chg)
@@ -82,34 +82,35 @@ class DailySignalGenerator:
 
     @staticmethod
     def volume_price_divergence(prices, volume, lookback=20):
-        """量价背离因子 — 价格与成交量的排名相关性变化
+        """Volume-price divergence factor — change in the rank correlation between price and volume
 
-        核心逻辑:
-        - 价格创新高但成交量萎缩 → 上涨动能不足，看跌信号 (负值)
-        - 价格创新低但成交量放大 → 恐慌性抛售/底部放量，看涨信号 (正值)
+        Core logic:
+        - Price makes a new high on shrinking volume -> weak upside momentum, bearish signal (negative)
+        - Price makes a new low on expanding volume -> capitulation / bottom volume spike, bullish signal (positive)
 
-        计算方法:
-        1. 在 lookback(20日) 滚动窗口内，对每只股票的价格和成交量
-           分别做时序排名 (rank)
-        2. 计算两组排名的 Spearman 相关系数
-        3. 取负值: 正相关(量价齐升)是常态，负相关(量价背离)才有信息量
-           背离越严重 → 信号绝对值越大
-        4. 截面排名归一化到 [-1, 1]
+        Method:
+        1. Within a rolling lookback window (20 days), time-series rank each stock's price
+           and volume separately
+        2. Compute the Spearman correlation between the two rank series
+        3. Negate it: positive correlation (price and volume rising together) is the norm, so only
+           negative correlation (divergence) carries information
+           The stronger the divergence, the larger the absolute signal
+        4. Cross-sectionally rank and normalize to [-1, 1]
 
         Parameters
         ----------
         prices : pd.DataFrame
-            收盘价，index=日期，columns=股票代码
+            Close prices, index=date, columns=stock code
         volume : pd.DataFrame
-            成交量，index=日期，columns=股票代码
+            Trading volume, index=date, columns=stock code
         lookback : int
-            滚动窗口长度，默认20日（约1个月）
+            Rolling window length, default 20 days (roughly one month)
 
         Returns
         -------
         pd.DataFrame
-            量价背离信号，index=日期，columns=股票代码，值域 [-1, 1]
-            正值 = 看涨(底部放量型背离)，负值 = 看跌(顶部缩量型背离)
+            Volume-price divergence signal, index=date, columns=stock code, bounded to [-1, 1]
+            Positive = bullish (bottom volume-spike divergence), negative = bearish (top volume-dryup divergence)
         """
         # 滚动窗口内价格排名与成交量排名的 Spearman 相关系数
         # 使用 rolling apply 逐列计算
@@ -154,17 +155,17 @@ class DailySignalGenerator:
 
     @staticmethod
     def vwap_deviation(close, vwap):
-        """VWAP偏离度 — 机构买卖压力指标
+        """VWAP deviation — institutional buy/sell pressure indicator
         (close - vwap) / vwap
-        close > vwap 说明收盘前有买压（机构扫货），反之为卖压
+        close > vwap indicates buying pressure into the close (institutional accumulation); otherwise selling pressure
         """
         raw = (close - vwap) / vwap.replace(0, np.nan)
         return DailySignalGenerator.cross_sectional_rank(raw)
 
     @staticmethod
     def vwap_reversion(close, vwap, lookback=5):
-        """VWAP累计偏离 — N日VWAP偏离均值回复信号
-        累计偏离越大，回复概率越高（取负值做反转）
+        """Cumulative VWAP deviation — N-day mean-reversion signal on VWAP deviation
+        The larger the cumulative deviation, the higher the probability of reversion (negated for reversal)
         """
         deviation = (close - vwap) / vwap.replace(0, np.nan)
         cum_dev = deviation.rolling(lookback).sum()
@@ -175,18 +176,18 @@ class DailySignalGenerator:
 
     @staticmethod
     def realized_vol_20d(returns):
-        """20日已实现波动率（年化） — 低波动异象
-        低波动股票长期风险调整收益更优 (Baker, Bradley, Wurgler 2011)
-        取负值：低波动 → 高信号
+        """20-day realized volatility (annualized) — low-volatility anomaly
+        Low-volatility stocks deliver better long-run risk-adjusted returns (Baker, Bradley, Wurgler 2011)
+        Negated: low volatility -> high signal
         """
         raw = returns.rolling(20, min_periods=15).std() * np.sqrt(252)
         return DailySignalGenerator.cross_sectional_rank(-raw)
 
     @staticmethod
     def vol_breakout(prices, lookback=20):
-        """波动率突破 — 当日振幅 vs 历史平均振幅
-        需要high和low，但这里用prices(close)近似：用rolling max-min / close
-        检测突破行情，高值表示可能的趋势启动
+        """Volatility breakout — today's range vs the historical average range
+        Ideally needs high and low, but approximates them from prices (close): rolling max-min / close
+        Detects breakouts; high values suggest a trend may be starting
         """
         # 使用收盘价的日收益绝对值作为振幅代理
         daily_range = prices.pct_change().abs()
@@ -196,8 +197,8 @@ class DailySignalGenerator:
 
     @staticmethod
     def vol_breakout_hl(high, low, close, lookback=20):
-        """波动率突破 (高低价版) — (high-low)/close vs 历史均值
-        检测当日振幅是否异常放大，用于识别breakout
+        """Volatility breakout (high-low version) — (high-low)/close vs its historical mean
+        Detects abnormal expansion in the day's range, used to identify breakouts
         """
         intraday_range = (high - low) / close.replace(0, np.nan)
         avg_range = intraday_range.rolling(lookback).mean()
@@ -206,9 +207,9 @@ class DailySignalGenerator:
 
     @staticmethod
     def overnight_gap(open_prices, prev_close):
-        """隔夜跳空 — (open / prev_close - 1)
-        反映隔夜信息冲击，正跳空可能是利好，但也可能过度反应
-        输入prev_close = close.shift(1)
+        """Overnight gap — (open / prev_close - 1)
+        Captures overnight information shocks; a gap up may reflect good news but can also be an overreaction
+        Pass prev_close = close.shift(1)
         """
         raw = open_prices / prev_close.replace(0, np.nan) - 1
         return DailySignalGenerator.cross_sectional_rank(raw)
@@ -217,9 +218,9 @@ class DailySignalGenerator:
 
     @staticmethod
     def amihud_illiquidity(returns, dollar_volume):
-        """Amihud非流动性 — |return| / 美元成交额, Amihud (2002)
-        高值 = 低流动性 = 流动性溢价（取负值：低非流动性更优）
-        取20日滚动均值平滑
+        """Amihud illiquidity — |return| / dollar volume, Amihud (2002)
+        High values = low liquidity = liquidity premium (negated: lower illiquidity is preferred)
+        Smoothed with a 20-day rolling mean
         """
         illiq = returns.abs() / dollar_volume.replace(0, np.nan)
         raw = illiq.rolling(20, min_periods=10).mean()
@@ -227,17 +228,17 @@ class DailySignalGenerator:
 
     @staticmethod
     def trade_intensity(trade_count, volume):
-        """单笔成交量 — volume / trade_count（机构足迹）
-        大单笔成交量暗示机构参与，通常是信息驱动的交易
+        """Average trade size — volume / trade_count (institutional footprint)
+        Large average trade size suggests institutional participation, typically information-driven trading
         """
         raw = volume / trade_count.replace(0, np.nan)
         return DailySignalGenerator.cross_sectional_rank(raw)
 
     @staticmethod
     def high_low_spread(high, low, close):
-        """高低价差 — (high - low) / close，日内价差代理
-        Corwin & Schultz (2012) 高低价差估计，衡量交易成本
-        取负值：低价差（低交易成本）更优
+        """High-low spread — (high - low) / close, an intraday spread proxy
+        Corwin & Schultz (2012) high-low spread estimator, a measure of trading cost
+        Negated: a narrow spread (low trading cost) is preferred
         """
         raw = (high - low) / close.replace(0, np.nan)
         return DailySignalGenerator.cross_sectional_rank(-raw)
@@ -246,21 +247,22 @@ class DailySignalGenerator:
 
     @staticmethod
     def build_daily_signal(data_dict, weights=None):
-        """构建日频复合因子信号
+        """Build the daily composite factor signal
 
         Parameters
         ----------
         data_dict : dict
-            必须包含 'close', 'volume' 键；可选 'open', 'high', 'low',
-            'vwap', 'trade_count'
+            Must contain the 'close' and 'volume' keys; 'open', 'high', 'low',
+            'vwap' and 'trade_count' are optional
         weights : dict or None
-            因子名 → 权重的字典。默认等权使用所有可计算的因子。
-            例: {'momentum_5d': 0.2, 'vwap_deviation': 0.3, 'volume_surge': 0.5}
+            Mapping of factor name → weight. Defaults to equal weights across every
+            factor that can be computed.
+            e.g. {'momentum_5d': 0.2, 'vwap_deviation': 0.3, 'volume_surge': 0.5}
 
         Returns
         -------
         pd.DataFrame
-            复合信号，date × symbol，值域 [-1, 1]
+            Composite signal, date x symbol, bounded to [-1, 1]
         """
         sg = DailySignalGenerator
         signals = {}
@@ -337,18 +339,18 @@ class DailySignalGenerator:
 
 
 def prepare_daily_signals(alpaca_data_dict):
-    """便捷函数 — 从Alpaca日线数据一次性计算全部日频信号
+    """Convenience function — compute every daily signal from Alpaca daily bars in one call
 
     Parameters
     ----------
     alpaca_data_dict : dict
-        键为 'close', 'open', 'high', 'low', 'volume', 'vwap', 'trade_count'
-        值为 DataFrame (date × symbol)
+        Keys are 'close', 'open', 'high', 'low', 'volume', 'vwap', 'trade_count'
+        Values are DataFrames (date x symbol)
 
     Returns
     -------
     dict
-        信号名 → DataFrame 的字典，每个DataFrame为 date × symbol，值域 [-1, 1]
+        Mapping of signal name → DataFrame, each date x symbol and bounded to [-1, 1]
     """
     sg = DailySignalGenerator
 

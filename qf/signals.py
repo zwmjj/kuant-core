@@ -1,10 +1,10 @@
-"""信号计算工具库 — 含因子策略"""
+"""Signal computation toolkit — including factor strategies"""
 import numpy as np
 import pandas as pd
 
 
 class SignalGenerator:
-    """所有因子信号的静态方法集合"""
+    """Collection of static methods for all factor signals"""
 
     # ── 动量类 ──
 
@@ -29,7 +29,7 @@ class SignalGenerator:
 
     @staticmethod
     def high_52_week(prices):
-        """52周(12月)新高接近度 — George & Hwang (2004)"""
+        """Proximity to the 52-week (12-month) high — George & Hwang (2004)"""
         high12 = prices.shift(1).rolling(12).max()
         current = prices.shift(1)
         ratio = current / high12.replace(0, np.nan)
@@ -39,31 +39,31 @@ class SignalGenerator:
 
     @staticmethod
     def volatility(returns, window=12):
-        """已修复: shift(1) 避免包含当月数据"""
+        """Fixed: shift(1) avoids including the current month's data"""
         return returns.shift(1).rolling(window).std() * np.sqrt(12)
 
     @staticmethod
     def vol_of_vol(returns, vol_window=12, vov_window=12):
-        """Vol-of-Vol — 波动率的波动率，越不稳定越差"""
+        """Vol-of-Vol — the volatility of volatility; less stable is worse"""
         vol = returns.shift(1).rolling(vol_window).std()
         return vol.rolling(vov_window).std()
 
     @staticmethod
     def downside_vol(returns, window=12):
-        """Downside Volatility — 仅下行波动率 (semi-deviation)"""
+        """Downside Volatility — downside-only volatility (semi-deviation)"""
         neg = returns.shift(1).clip(upper=0)
         return neg.rolling(window).std() * np.sqrt(12)
 
     @staticmethod
     def max_return(returns, window=12):
         """MAX — Bali, Cakici, Whitelaw (2011)
-        过去12月最大单月收益。高MAX预期低收益（彩票效应）"""
+        Largest single-month return over the past 12 months. High MAX predicts low returns (lottery effect)"""
         return returns.shift(1).rolling(window).max()
 
     @staticmethod
     def beta_market(returns, spy_ret, window=36):
         """Market Beta — Frazzini & Pedersen (2014) BAB
-        低beta预期更高风险调整收益"""
+        Low beta predicts higher risk-adjusted returns"""
         spy = spy_ret.copy()
         spy.index = spy.index.to_period('M')
         rets = returns.copy()
@@ -91,29 +91,29 @@ class SignalGenerator:
 
     @staticmethod
     def skewness(returns, window=12):
-        """Rolling Skewness — 高偏度（彩票型）预期低收益"""
+        """Rolling Skewness — high skewness (lottery-like) predicts low returns"""
         return returns.shift(1).rolling(window).skew()
 
     @staticmethod
     def vol_term_structure(returns, short_window=3, long_window=12):
-        """Vol Term Structure — 短期vol/长期vol
-        >1表示近期波动上升（风险增加），<1表示趋于平静"""
+        """Vol Term Structure — short-term vol / long-term vol
+        >1 means recent volatility is rising (risk increasing), <1 means it is calming down"""
         short_vol = returns.shift(1).rolling(short_window).std()
         long_vol = returns.shift(1).rolling(long_window).std()
         return short_vol / long_vol.replace(0, np.nan)
 
     @staticmethod
     def vol_momentum(returns, window=12):
-        """Volatility Momentum — 波动率变化
-        波动率下降的股票预期更好（风险降低趋势）"""
+        """Volatility Momentum — change in volatility
+        Stocks with falling volatility are expected to do better (declining-risk trend)"""
         vol = returns.shift(1).rolling(window).std()
         vol_chg = vol.pct_change(3)  # 3-month change in vol
         return vol_chg
 
     @staticmethod
     def idiosyncratic_vol(returns, ff5, window=36):
-        """特质波动率 — Ang et al. (2006)
-        使用FF3滚动回归残差的标准差，低IVOL预期更高收益
+        """Idiosyncratic volatility — Ang et al. (2006)
+        Standard deviation of rolling FF3 regression residuals; low IVOL predicts higher returns
         """
         rets = returns.copy()
         ff = ff5[['mktrf', 'smb', 'hml']].copy()
@@ -198,32 +198,32 @@ class SignalGenerator:
 
     @staticmethod
     def book_to_market(ccm_fund, returns):
-        """账面市值比 — Fama & French (1992)"""
+        """Book-to-market ratio — Fama & French (1992)"""
         return SignalGenerator._map_annual_to_monthly(
             ccm_fund, returns, 'bm', ascending=True)  # high BM = value = buy
 
     @staticmethod
     def earnings_to_price(ccm_fund, returns):
-        """盈利价格比 — Basu (1977)"""
+        """Earnings-to-price ratio — Basu (1977)"""
         return SignalGenerator._map_annual_to_monthly(
             ccm_fund, returns, 'ep', ascending=True)  # high EP = cheap = buy
 
     @staticmethod
     def return_on_equity(ccm_fund, returns):
-        """净资产收益率 — Hou, Xue, Zhang (2015)"""
+        """Return on equity — Hou, Xue, Zhang (2015)"""
         return SignalGenerator._map_annual_to_monthly(
             ccm_fund, returns, 'roe', ascending=True)  # high ROE = buy
 
     @staticmethod
     def gross_profitability(ccm_fund, returns):
-        """毛利资产比 — Novy-Marx (2013)"""
+        """Gross profits-to-assets — Novy-Marx (2013)"""
         return SignalGenerator._map_annual_to_monthly(
             ccm_fund, returns, 'gpa', ascending=True)  # high GPA = buy
 
     @staticmethod
     def asset_growth(ccm_fund, returns):
-        """资产增长 — Cooper, Gulen, Schill (2008)
-        低资产增长预期更高收益（投资异象）
+        """Asset growth — Cooper, Gulen, Schill (2008)
+        Low asset growth predicts higher returns (the investment anomaly)
         """
         return SignalGenerator._map_annual_to_monthly(
             ccm_fund, returns, 'asset_growth', ascending=False)  # low growth = buy
@@ -232,40 +232,40 @@ class SignalGenerator:
 
     @staticmethod
     def turnover_ratio(ccm_fund, returns):
-        """资产周转率 — 衡量资产使用效率
-        高周转率表示公司更高效地利用资产创造收入
+        """Asset turnover ratio — a measure of asset utilization efficiency
+        A high turnover ratio indicates the firm generates revenue more efficiently from its assets
         """
         return SignalGenerator._map_annual_to_monthly(
             ccm_fund, returns, 'turnover_ratio', ascending=True)  # high turnover = buy
 
     @staticmethod
     def revenue_growth(ccm_fund, returns):
-        """营收增长率 — Lakonishok, Shleifer, Vishny (1994)
-        高营收增长预期更高收益（成长因子）
+        """Revenue growth — Lakonishok, Shleifer, Vishny (1994)
+        High revenue growth predicts higher returns (growth factor)
         """
         return SignalGenerator._map_annual_to_monthly(
             ccm_fund, returns, 'revt_growth', ascending=True)  # high growth = buy
 
     @staticmethod
     def debt_to_equity(ccm_fund, returns):
-        """负债权益比 — Bhandari (1988)
-        低负债率公司财务更稳健，长期表现更好
+        """Debt-to-equity ratio — Bhandari (1988)
+        Firms with lower leverage are financially sounder and perform better over the long run
         """
         return SignalGenerator._map_annual_to_monthly(
             ccm_fund, returns, 'de_ratio', ascending=False)  # low debt = buy
 
     @staticmethod
     def price_to_sales(ccm_fund, returns):
-        """市销率倒数 (Sales/Price) — Barbee et al. (1996)
-        低PS（高S/P）的公司被低估，预期更高收益
+        """Inverse price-to-sales (Sales/Price) — Barbee et al. (1996)
+        Firms with low P/S (high S/P) are undervalued and predict higher returns
         """
         return SignalGenerator._map_annual_to_monthly(
             ccm_fund, returns, 'sp', ascending=True)  # high S/P = cheap = buy
 
     @staticmethod
     def net_income_growth(ccm_fund, returns):
-        """净利润增长率 — 盈利成长因子
-        持续增长的净利润是盈利质量和趋势的信号
+        """Net income growth — an earnings growth factor
+        Sustained net income growth signals earnings quality and trend
         """
         return SignalGenerator._map_annual_to_monthly(
             ccm_fund, returns, 'ni_growth', ascending=True)  # high growth = buy
@@ -274,7 +274,7 @@ class SignalGenerator:
 
     @staticmethod
     def ff5_alpha(returns, ff5, window=36):
-        """FF5滚动Alpha — 动量alpha策略"""
+        """Rolling FF5 alpha — a momentum-alpha strategy"""
         rets = returns.copy()
         ff = ff5[['mktrf', 'smb', 'hml', 'umd']].copy()
         rf = ff5['rf'].copy()
@@ -341,14 +341,14 @@ class SignalGenerator:
 
     @staticmethod
     def crash_filter(returns):
-        """已修复: shift(1) 使用上月收益率，避免前视偏差"""
+        """Fixed: shift(1) uses the previous month's return to avoid look-ahead bias"""
         last_ret = returns.shift(1)
         pct10 = last_ret.quantile(0.10, axis=1)
         return last_ret.lt(pct10, axis=0)
 
     @staticmethod
     def quality_signal(ccm_fund, returns):
-        """复合质量信号 (ROE + leverage + asset_growth)"""
+        """Composite quality signal (ROE + leverage + asset_growth)"""
         fund = ccm_fund.copy()
         frames = []
         for year in sorted(fund['year'].unique()):
@@ -380,7 +380,7 @@ class SignalGenerator:
 def build_signal(returns, prices, mktcap, ccm_fund,
                  w_mom=0.50, w_accel=0.20, w_quality=0.20, w_vol=0.10,
                  cap_quantile=0.75, verbose=True):
-    """构建复合动量信号（原始接口，向后兼容）"""
+    """Build the composite momentum signal (original interface, kept for backward compatibility)"""
     sg = SignalGenerator()
     def to_float(df):
         return df.apply(pd.to_numeric, errors='coerce')
@@ -406,15 +406,15 @@ def build_signal(returns, prices, mktcap, ccm_fund,
 
 
 def build_factor_signal(factor_id, data, cap_quantile=0.75, verbose=True):
-    """构建单因子信号
+    """Build a single-factor signal
 
     Parameters
     ----------
     factor_id : str
-        因子ID: 'mom12', 'accel', 'high52', 'bm', 'ep', 'roe', 'gpa',
+        Factor ID: 'mom12', 'accel', 'high52', 'bm', 'ep', 'roe', 'gpa',
                  'ag', 'ivol', 'ff5alpha', 'composite'
     data : dict
-        prepare_data() 返回的数据字典
+        Data dictionary returned by prepare_data()
     """
     sg = SignalGenerator()
     returns = data['returns']
@@ -502,16 +502,16 @@ def build_factor_signal(factor_id, data, cap_quantile=0.75, verbose=True):
 # ── 条件交互信号 (Round 1) ──
 
 def build_interaction_signal(interaction_id, data, cap_quantile=0.75, verbose=True):
-    """条件交互信号 — 两因子相乘，只在两者同时看好时做多
+    """Conditional interaction signal — product of two factors; long only when both are favorable
 
     Parameters
     ----------
     interaction_id : str
-        'quality_mom'   : GPA排名 × 动量排名（只做高质量动量股）
-        'value_quality' : BM排名 × ROE排名（只做盈利的价值股）
-        'profit_growth' : GPA排名 × 低资产增长排名（盈利+保守投资）
-        'roe_mom'       : ROE排名 × 动量排名（盈利+趋势确认）
-        'alpha_quality' : FF5α × GPA（alpha+质量双重确认）
+        'quality_mom'   : GPA rank x momentum rank (high-quality momentum stocks only)
+        'value_quality' : BM rank x ROE rank (profitable value stocks only)
+        'profit_growth' : GPA rank x low-asset-growth rank (profitability + conservative investment)
+        'roe_mom'       : ROE rank x momentum rank (profitability + trend confirmation)
+        'alpha_quality' : FF5 alpha x GPA (alpha + quality double confirmation)
     """
     sg = SignalGenerator()
     returns = data['returns']
@@ -561,10 +561,10 @@ def build_interaction_signal(interaction_id, data, cap_quantile=0.75, verbose=Tr
 
 
 def build_orthogonal_signal(factor_id, data, cap_quantile=0.75, verbose=True):
-    """正交化信号 — 剥离FF因子暴露后的残差alpha
+    """Orthogonalized signal — residual alpha after stripping out FF factor exposures
 
-    对原始信号按月做截面回归：signal_i = a + b1*beta_i + b2*size_i + b3*bm_i + e_i
-    使用残差 e_i 作为正交化信号
+    Runs a monthly cross-sectional regression on the raw signal: signal_i = a + b1*beta_i + b2*size_i + b3*bm_i + e_i
+    and uses the residual e_i as the orthogonalized signal
     """
     sg = SignalGenerator()
     returns = data['returns']
@@ -626,11 +626,11 @@ def build_orthogonal_signal(factor_id, data, cap_quantile=0.75, verbose=True):
 # ── 自适应择时 (Round 2) ──
 
 def build_regime_adjusted_signal(factor_id, data, cap_quantile=0.75, verbose=True):
-    """自适应择时信号 — 根据市场状态调整因子权重
+    """Adaptive timing signal — adjusts factor weights by market regime
 
-    - 高波动时减少动量暴露（动量崩溃风险）
-    - 低波动时增加动量暴露
-    - 价值因子在价值利差大时加大暴露
+    - Reduce momentum exposure in high-volatility regimes (momentum crash risk)
+    - Increase momentum exposure in low-volatility regimes
+    - Increase value exposure when the value spread is wide
     """
     sg = SignalGenerator()
     returns = data['returns']

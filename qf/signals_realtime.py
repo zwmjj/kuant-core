@@ -1,26 +1,26 @@
-"""实时因子信号引擎 — 基于滚动窗口的增量计算，适用于逐bar流式数据"""
+"""Real-time factor signal engine - incremental rolling-window computation for bar-by-bar streaming data."""
 import numpy as np
 from collections import defaultdict, deque
 from typing import Dict, Optional
 
 
 class RealtimeSignalEngine:
-    """实时因子计算引擎
+    """Real-time factor computation engine
 
-    设计原则:
-    - 增量更新: 每次收到新bar只做 O(1) 计算，不重算历史
-    - 滚动窗口: 使用 deque 维护定长窗口，自动丢弃过期数据
-    - warmup 保护: 数据不足时因子返回 None，避免错误信号
+    Design principles:
+    - Incremental updates: each new bar costs O(1); history is never recomputed
+    - Rolling windows: fixed-length deques automatically drop stale data
+    - Warmup guard: factors return None until enough data is available, avoiding spurious signals
 
-    使用方式:
+    Usage:
         engine = RealtimeSignalEngine(window=20, rsi_period=14)
-        engine.update("AAPL", bar_data)    # 逐bar推送
-        signals = engine.get_signals("AAPL")  # 获取当前全部因子
-        score = engine.get_composite_signal("AAPL", weights)  # 加权综合分
+        engine.update("AAPL", bar_data)    # push one bar
+        signals = engine.get_signals("AAPL")  # all current factors
+        score = engine.get_composite_signal("AAPL", weights)  # weighted composite score
 
-    bar_data 格式 (dict):
-        必须字段: close, volume, timestamp
-        可选字段: high, low, open, vwap, bid, ask
+    bar_data format (dict):
+        Required fields: close, volume, timestamp
+        Optional fields: high, low, open, vwap, bid, ask
     """
 
     def __init__(self, window: int = 20, rsi_period: int = 14):
@@ -67,20 +67,20 @@ class RealtimeSignalEngine:
     # ═══════════════════════════════════════════════════════
 
     def update(self, symbol: str, bar_data: dict) -> Dict[str, Optional[float]]:
-        """接收新 bar 数据，增量更新所有因子
+        """Ingest a new bar and incrementally update all factors
 
         Parameters
         ----------
         symbol : str
-            标的代码，如 "AAPL"
+            Instrument code, e.g. "AAPL"
         bar_data : dict
-            必须包含 'close' 和 'volume'；
-            可选: 'high', 'low', 'open', 'vwap', 'bid', 'ask', 'timestamp'
+            Must contain 'close' and 'volume';
+            optional: 'high', 'low', 'open', 'vwap', 'bid', 'ask', 'timestamp'
 
         Returns
         -------
         dict
-            当前所有因子值（同 get_signals）
+            All current factor values (same as get_signals)
         """
         buf = self._buffers[symbol]
 
@@ -105,12 +105,12 @@ class RealtimeSignalEngine:
         return self.get_signals(symbol)
 
     def get_signals(self, symbol: str) -> Dict[str, Optional[float]]:
-        """返回该 symbol 当前所有因子值
+        """Return all current factor values for this symbol
 
         Returns
         -------
         dict
-            键为因子名，值为 float 或 None（warmup 期不足）
+            Keyed by factor name; values are float or None (insufficient warmup)
         """
         return {
             'realtime_momentum': self._calc_momentum(symbol),
@@ -214,22 +214,22 @@ class RealtimeSignalEngine:
         symbol: str,
         weights: Optional[Dict[str, float]] = None,
     ) -> Optional[float]:
-        """返回加权综合信号，值域 [-1, 1]
+        """Return the weighted composite signal, ranged [-1, 1]
 
         Parameters
         ----------
         symbol : str
-            标的代码
+            Instrument code
         weights : dict or None
-            因子名 -> 权重。None 则等权。
-            例: {'realtime_momentum': 0.3, 'realtime_rsi': 0.3,
+            Factor name -> weight. None means equal weighting.
+            e.g. {'realtime_momentum': 0.3, 'realtime_rsi': 0.3,
                  'realtime_volume_surge': 0.2, 'realtime_vwap_deviation': 0.1,
                  'realtime_spread_signal': 0.1}
 
         Returns
         -------
         float or None
-            综合信号，[-1, 1]。如果所有因子均为 None 则返回 None。
+            Composite signal in [-1, 1]. Returns None if every factor is None.
         """
         signals = self.get_signals(symbol)
 
@@ -262,7 +262,7 @@ class RealtimeSignalEngine:
     # ═══════════════════════════════════════════════════════
 
     def reset(self, symbol: Optional[str] = None):
-        """重置指定 symbol 的全部状态，或重置所有"""
+        """Reset all state for the given symbol, or for every symbol."""
         if symbol is None:
             self._buffers.clear()
             self._rsi_state.clear()
@@ -273,7 +273,7 @@ class RealtimeSignalEngine:
             self._vwap_state.pop(symbol, None)
 
     def get_bar_count(self, symbol: str) -> int:
-        """返回已接收的 bar 数量"""
+        """Return the number of bars received so far."""
         return self._buffers[symbol]['bar_count']
 
     # ═══════════════════════════════════════════════════════

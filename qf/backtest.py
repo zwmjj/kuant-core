@@ -1,4 +1,4 @@
-"""回测引擎 (事件驱动)"""
+"""Backtest engine (event-driven)."""
 import numpy as np
 import pandas as pd
 from qf.costs import ExecutionHandler, SignalEvent, OrderEvent
@@ -70,7 +70,7 @@ class DataHandler:
 
 
 class StrategyEngine:
-    """信号->权重 引擎 (事件驱动回测用)"""
+    """Signal-to-weight engine (for event-driven backtests)."""
     def __init__(self, signal_df, long_n=20, short_n=20, long_pct=1.15, short_pct=0.15,
                  weight_mode='inv_vol', inv_vol_df=None, turnover_penalty=0.0,
                  optimizer=None, cov_estimator=None):
@@ -179,7 +179,7 @@ Backtester = EventDrivenBacktester
 def run_event_driven(d, signal, long_n=20, short_n=20, long_pct=1.15, short_pct=0.15,
                      weight_mode='inv_vol', turnover_penalty=0.25,
                      cost_model='sqrt', verbose=True, **cost_kw):
-    """便捷函数"""
+    """Convenience wrapper."""
     inv_vol = 1.0 / d['returns'].rolling(12).std().replace(0, np.nan)
     dh = DataHandler(d['prices'], d['returns'], d.get('volume'), d.get('adv_dollar'))
     se = StrategyEngine(signal, long_n=long_n, short_n=short_n,

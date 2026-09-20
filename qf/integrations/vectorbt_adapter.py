@@ -1,7 +1,8 @@
-"""vectorbt 快速向量化回测适配器
+"""vectorbt fast vectorized backtest adapter
 vectorbt: https://github.com/polakvoj/vectorbt
-提供高性能向量化回测、组合优化、信号生成与绩效分析。
-结果以 dict 返回, 方便 JSON 序列化传给 API 层。
+Provides high-performance vectorized backtesting, portfolio optimization, signal
+generation and performance analysis.
+Results are returned as a dict so they can be JSON-serialized for the API layer.
 """
 import warnings
 import numpy as np
@@ -88,29 +89,29 @@ def run_vbt_backtest(
     rebalance_freq: int = 21,
     freq: str = "D",
 ) -> dict:
-    """使用 vectorbt 运行快速向量化回测。
+    """Run a fast vectorized backtest with vectorbt.
 
     Parameters
     ----------
     signal : pd.DataFrame
-        KQ 信号矩阵 (date x stock)
+        KQ signal matrix (date x stock)
     prices : pd.DataFrame
-        价格矩阵 (date x stock), 日频
+        Price matrix (date x stock), daily
     cash : float
-        初始资金
+        Initial capital
     commission : float
-        手续费率
+        Commission rate
     top_n : int
-        持仓数量
+        Number of positions to hold
     rebalance_freq : int
-        再平衡频率 (交易日)
+        Rebalance frequency (trading days)
     freq : str
-        数据频率, 'D' 日频, 'M' 月频
+        Data frequency, 'D' for daily, 'M' for monthly
 
     Returns
     -------
     dict
-        回测结果, 含 total_return, sharpe, max_drawdown 等
+        Backtest results, including total_return, sharpe, max_drawdown, etc.
     """
     _check_vbt()
 
@@ -147,25 +148,25 @@ def run_vbt_from_orders(
     commission: float = 0.001,
     freq: str = "D",
 ) -> dict:
-    """使用 vectorbt 按目标仓位运行回测。
+    """Run a backtest with vectorbt from target positions.
 
     Parameters
     ----------
     prices : pd.DataFrame
-        价格矩阵 (date x stock)
+        Price matrix (date x stock)
     size : pd.DataFrame
-        目标仓位权重矩阵 (date x stock), 值域 [0, 1]
+        Target position weight matrix (date x stock), values in [0, 1]
     cash : float
-        初始资金
+        Initial capital
     commission : float
-        手续费率
+        Commission rate
     freq : str
-        数据频率
+        Data frequency
 
     Returns
     -------
     dict
-        回测结果
+        Backtest results
     """
     _check_vbt()
 
@@ -192,25 +193,25 @@ def run_vbt_indicator_backtest(
     cash: float = 1_000_000.0,
     commission: float = 0.001,
 ) -> dict:
-    """使用 vectorbt 内置 MA 交叉信号回测。
+    """Backtest vectorbt's built-in MA crossover signal.
 
     Parameters
     ----------
     prices : pd.DataFrame
-        价格矩阵 (date x stock)
+        Price matrix (date x stock)
     fast_window : int
-        快速移动平均窗口
+        Fast moving average window
     slow_window : int
-        慢速移动平均窗口
+        Slow moving average window
     cash : float
-        初始资金
+        Initial capital
     commission : float
-        手续费率
+        Commission rate
 
     Returns
     -------
     dict
-        回测结果
+        Backtest results
     """
     _check_vbt()
 
@@ -276,15 +277,15 @@ def get_vbt_portfolio(
     cash: float = 1_000_000.0,
     commission: float = 0.001,
 ):
-    """直接返回 vectorbt Portfolio 对象, 供进一步自定义分析。
+    """Return the raw vectorbt Portfolio object for further custom analysis.
 
     Parameters
     ----------
     prices : pd.DataFrame
     entries : pd.DataFrame
-        布尔矩阵, True = 买入
+        Boolean matrix, True = buy
     exits : pd.DataFrame
-        布尔矩阵, True = 卖出
+        Boolean matrix, True = sell
     cash : float
     commission : float
 

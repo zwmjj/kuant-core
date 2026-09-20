@@ -1,4 +1,4 @@
-"""框架主入口 — 一行换策略"""
+"""Framework entry point - swap strategies with a single line."""
 import sys
 sys.stdout.reconfigure(encoding='utf-8')
 import warnings; warnings.filterwarnings('ignore')
@@ -13,9 +13,9 @@ from qf.viz import generate_full_report
 
 class Framework:
     """
-    量化研究框架 — 换策略只需改一行
+    Quant research framework - switching strategies takes one line
 
-    使用:
+    Usage:
         from qf import Framework
         from strategies.momentum import MomentumStrategy
 
@@ -34,7 +34,7 @@ class Framework:
         return self.data
 
     def run(self, strategy, visualize=True, stress_test=True, gate_check=True):
-        """运行完整流程: 回测 + 归因 + 风控 + 压力测试 + 可视化"""
+        """Run the full pipeline: backtest + attribution + risk control + stress test + visualization."""
         d = self._load_data()
         params = strategy.get_params()
 

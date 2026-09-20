@@ -1,4 +1,4 @@
-"""A股日内与特色数据加载 — akshare (分钟线/龙虎榜/大宗交易/北向资金/融资融券)"""
+"""A-share intraday and alternative data loading — akshare (minute bars / dragon-tiger list / block trades / northbound flow / margin trading)"""
 import os, pickle, warnings, time
 import akshare as ak
 import pandas as pd
@@ -33,7 +33,7 @@ def _save_cache(name, data):
 
 # ── 主类 ─────────────────────────────────────────────────
 class ChinaIntradayLoader:
-    """A股日内及特色数据加载器，基于 akshare"""
+    """A-share intraday and alternative data loader, built on akshare"""
 
     # ── 分钟线 ────────────────────────────────────────────
     @staticmethod
@@ -43,17 +43,17 @@ class ChinaIntradayLoader:
         start_date: str = "",
         end_date: str = "",
     ) -> dict[str, pd.DataFrame]:
-        """获取A股分钟线数据
+        """Fetch A-share minute bar data
 
         Args:
-            symbols: 股票代码列表，如 ["000001", "600519"]
-            period: K线周期 "1"/"5"/"15"/"30"/"60"（分钟）
-            start_date: 开始日期 "YYYY-MM-DD HH:MM:SS"（可选）
-            end_date: 结束日期 "YYYY-MM-DD HH:MM:SS"（可选）
+            symbols: list of stock codes, e.g. ["000001", "600519"]
+            period: bar frequency "1"/"5"/"15"/"30"/"60" (minutes)
+            start_date: start datetime "YYYY-MM-DD HH:MM:SS" (optional)
+            end_date: end datetime "YYYY-MM-DD HH:MM:SS" (optional)
 
         Returns:
-            dict[str, pd.DataFrame]，每个 symbol 一个 DataFrame
-            列: 时间, 开盘, 收盘, 最高, 最低, 成交量, 成交额
+            dict[str, pd.DataFrame], one DataFrame per symbol
+            Columns: time, open, close, high, low, volume, turnover
         """
         assert period in ("1", "5", "15", "30", "60"), \
             f"period 须为 1/5/15/30/60，收到: {period}"
@@ -96,13 +96,13 @@ class ChinaIntradayLoader:
     # ── 龙虎榜 ────────────────────────────────────────────
     @staticmethod
     def get_dragon_tiger(date: str) -> pd.DataFrame:
-        """获取龙虎榜数据
+        """Fetch dragon-tiger list data
 
         Args:
-            date: 日期 "YYYYMMDD"，如 "20260330"
+            date: date "YYYYMMDD", e.g. "20260330"
 
         Returns:
-            DataFrame 含: 代码、名称、上榜原因、买入额、卖出额、净买入额等
+            DataFrame with: code, name, listing reason, buy amount, sell amount, net buy amount, etc.
         """
         cache_key = f"lhb_{date}"
         cached = _load_cache(cache_key, max_age_days=30)
@@ -129,13 +129,13 @@ class ChinaIntradayLoader:
     # ── 大宗交易 ──────────────────────────────────────────
     @staticmethod
     def get_block_trades(date: str) -> pd.DataFrame:
-        """获取大宗交易数据
+        """Fetch block trade data
 
         Args:
-            date: 日期 "YYYYMMDD"
+            date: date "YYYYMMDD"
 
         Returns:
-            DataFrame 含: 代码、名称、成交价、成交量、成交额、折溢价率等
+            DataFrame with: code, name, trade price, volume, turnover, premium/discount rate, etc.
         """
         cache_key = f"dzjy_{date}"
         cached = _load_cache(cache_key, max_age_days=30)
@@ -162,14 +162,14 @@ class ChinaIntradayLoader:
         start_date: str = "",
         end_date: str = "",
     ) -> pd.DataFrame:
-        """获取北向资金净流入数据
+        """Fetch northbound capital net inflow data
 
         Args:
-            start_date: 开始日期（可选）
-            end_date: 结束日期（可选）
+            start_date: start date (optional)
+            end_date: end date (optional)
 
         Returns:
-            DataFrame 含: 日期, 沪股通净流入, 深股通净流入, 北向资金净流入
+            DataFrame with: date, Shanghai Connect net inflow, Shenzhen Connect net inflow, total northbound net inflow
         """
         cache_key = f"hsgt_north_{start_date}_{end_date}"
         cached = _load_cache(cache_key, max_age_days=1)
@@ -204,15 +204,15 @@ class ChinaIntradayLoader:
         start_date: str = "",
         end_date: str = "",
     ) -> pd.DataFrame:
-        """获取个股融资融券数据
+        """Fetch per-stock margin trading data
 
         Args:
-            symbol: 股票代码，如 "000001"
-            start_date: 开始日期 "YYYYMMDD"
-            end_date: 结束日期 "YYYYMMDD"
+            symbol: stock code, e.g. "000001"
+            start_date: start date "YYYYMMDD"
+            end_date: end date "YYYYMMDD"
 
         Returns:
-            DataFrame 含: 日期、融资余额、融券余额、融资买入额、融券卖出量等
+            DataFrame with: date, margin balance, short balance, margin buy amount, short sell volume, etc.
         """
         cache_key = f"margin_{symbol}_{start_date}_{end_date}"
         cached = _load_cache(cache_key, max_age_days=1)

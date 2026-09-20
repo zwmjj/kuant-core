@@ -1,6 +1,7 @@
-"""期权衍生因子信号 — 基于 Alpaca 期权链数据
+"""Option-derived factor signals, built on Alpaca option-chain data.
 
-利用期权隐含波动率、偏度、期限结构等信息构建选股/择时因子。
+Constructs stock-selection and timing factors from implied volatility, skew
+and term structure.
 """
 import re
 import math
@@ -20,12 +21,12 @@ except ImportError:
 
 
 class OptionsSignalGenerator:
-    """期权链衍生因子生成器
+    """Factor generator for option-chain data.
 
-    Alpaca 期权链返回格式:
-        chain_dict[symbol] -> obj, 其中 obj.latest_quote 具有 .bid_price, .ask_price
-        symbol 格式: {UNDERLYING}{YYMMDD}{C/P}{STRIKE*1000 padded 8位}
-        例: 'AAPL260424P00295000' => AAPL, 2026-04-24, Put, 295.0
+    Alpaca returns an option chain in this shape:
+        chain_dict[symbol] -> obj, where obj.latest_quote has .bid_price, .ask_price
+        symbol format: {UNDERLYING}{YYMMDD}{C/P}{STRIKE*1000 zero-padded to 8}
+        e.g. 'AAPL260424P00295000' => AAPL, 2026-04-24, Put, 295.0
     """
 
     # 正则匹配期权符号: 字母部分(underlying) + 6位日期 + C/P + 8位行权价
@@ -41,17 +42,17 @@ class OptionsSignalGenerator:
     # ------------------------------------------------------------------
     @staticmethod
     def parse_option_symbol(sym: str) -> dict:
-        """解析 Alpaca 期权符号，返回结构化字典
+        """Parse an Alpaca option symbol into a structured dictionary.
 
         Parameters
         ----------
         sym : str
-            期权符号, 例如 'AAPL260424P00295000'
+            Option symbol, e.g. 'AAPL260424P00295000'
 
         Returns
         -------
         dict
-            包含 underlying, expiry, type, strike 四个字段
+            Keys underlying, expiry, type, strike
         """
         m = OptionsSignalGenerator._SYM_RE.match(sym)
         if m is None:
@@ -82,22 +83,23 @@ class OptionsSignalGenerator:
         underlying_price: float,
         ref_date: Optional[date] = None,
     ) -> pd.DataFrame:
-        """将 Alpaca 期权链字典转为 DataFrame
+        """Convert an Alpaca option-chain dictionary into a DataFrame.
 
         Parameters
         ----------
         chain_dict : dict
-            Alpaca 返回的期权链, key=symbol, value=对象(含 .latest_quote)
+            The chain as returned by Alpaca: key=symbol, value=object with
+            a .latest_quote attribute
         underlying_price : float
-            标的当前价格
+            Current price of the underlying
         ref_date : date, optional
-            参考日期, 默认今天; 用于计算距到期日天数
+            Reference date, defaulting to today; used to compute days to expiry
 
         Returns
         -------
         pd.DataFrame
-            包含 strike, expiry, type, bid, ask, mid, moneyness, dte 列;
-            已过滤 bid=0 的合约
+            Columns strike, expiry, type, bid, ask, mid, moneyness, dte.
+            Contracts quoted with bid=0 are dropped.
         """
         if ref_date is None:
             ref_date = date.today()
@@ -166,31 +168,31 @@ class OptionsSignalGenerator:
         option_type: str = 'call',
         risk_free_rate: float = 0.05,
     ) -> float:
-        """近似隐含波动率
+        """Approximate implied volatility.
 
-        优先使用 QuantLib (Newton-Raphson BSM反解); 不可用时退回
-        Brenner-Subrahmanyam (1988) 近似:
-            IV ≈ mid / (0.4 * S * sqrt(T))
+        Uses QuantLib where available (Newton-Raphson inversion of Black-Scholes);
+        otherwise falls back to the Brenner-Subrahmanyam (1988) approximation:
+            IV ~= mid / (0.4 * S * sqrt(T))
 
         Parameters
         ----------
         mid_price : float
-            期权中间价
+            Option mid price
         underlying_price : float
-            标的价格
+            Price of the underlying
         strike : float
-            行权价
+            Strike price
         days_to_expiry : int
-            距到期天数
+            Days remaining to expiry
         option_type : str
-            'call' 或 'put'
+            'call' or 'put'
         risk_free_rate : float
-            无风险利率, 默认 5%
+            Risk-free rate, default 5%
 
         Returns
         -------
         float
-            隐含波动率估计值 (年化, 小数形式)
+            Estimated implied volatility, annualized and expressed as a decimal
         """
         if days_to_expiry <= 0 or mid_price <= 0 or underlying_price <= 0:
             return np.nan
@@ -255,24 +257,24 @@ class OptionsSignalGenerator:
         underlying_price: float,
         days_range: tuple = (20, 60),
     ) -> float:
-        """平值附近的隐含波动率均值
+        """Mean implied volatility near the money.
 
-        筛选 moneyness 在 [0.95, 1.05] 且 DTE 在 days_range 内的期权,
-        对看涨和看跌分别计算 IV 后取均值。
+        Selects contracts with moneyness in [0.95, 1.05] and DTE inside
+        days_range, computes IV separately for calls and puts, and averages.
 
         Parameters
         ----------
         chain_df : pd.DataFrame
-            process_chain 输出
+            Output of process_chain
         underlying_price : float
-            标的当前价格
+            Current price of the underlying
         days_range : tuple
-            (最小DTE, 最大DTE), 默认 (20, 60)
+            (min DTE, max DTE), default (20, 60)
 
         Returns
         -------
         float
-            ATM IV 均值
+            Mean ATM implied volatility
         """
         if chain_df.empty:
             return np.nan
@@ -305,28 +307,29 @@ class OptionsSignalGenerator:
         underlying_price: float,
         days_range: tuple = (20, 60),
     ) -> float:
-        """隐含波动率偏度 — 25-delta put vs 25-delta call
+        """Implied-volatility skew - 25-delta put versus 25-delta call.
 
-        用 moneyness 近似:
-            25-delta put  ≈ moneyness 0.88~0.92 (OTM put)
-            25-delta call ≈ moneyness 1.08~1.12 (OTM call)
+        Delta is approximated by moneyness:
+            25-delta put  ~= moneyness 0.88-0.92 (OTM put)
+            25-delta call ~= moneyness 1.08-1.12 (OTM call)
 
-        正偏度 = 下行保护昂贵 = 看空情绪
-        返回信号: -skew (高偏度 => 看空标的)
+        Positive skew means downside protection is expensive, which reads as
+        bearish sentiment. The returned signal is -skew, so steep skew maps to
+        a bearish score.
 
         Parameters
         ----------
         chain_df : pd.DataFrame
-            process_chain 输出
+            Output of process_chain
         underlying_price : float
-            标的当前价格
+            Current price of the underlying
         days_range : tuple
-            DTE 筛选范围
+            DTE filter range
 
         Returns
         -------
         float
-            偏度信号 (负数 = 看空)
+            Skew signal; negative values are bearish
         """
         if chain_df.empty:
             return np.nan
@@ -382,22 +385,23 @@ class OptionsSignalGenerator:
         chain_df: pd.DataFrame,
         underlying_price: float,
     ) -> float:
-        """隐含波动率期限结构 — 短期 vs 长期
+        """Implied-volatility term structure - near-dated versus far-dated.
 
-        短期: DTE < 30, 长期: DTE > 60, 筛选近 ATM (0.95~1.05)
-        比值 > 1 表示短期恐慌, 看空信号
+        Near-dated is DTE < 30, far-dated is DTE > 60, both restricted to
+        near-the-money contracts (moneyness 0.95-1.05). A ratio above 1
+        indicates near-term stress and reads as bearish.
 
         Parameters
         ----------
         chain_df : pd.DataFrame
-            process_chain 输出
+            Output of process_chain
         underlying_price : float
-            标的当前价格
+            Current price of the underlying
 
         Returns
         -------
         float
-            短期IV / 长期IV 比值; > 1 看空
+            Near-dated IV / far-dated IV; values above 1 are bearish
         """
         if chain_df.empty:
             return np.nan
@@ -437,21 +441,21 @@ class OptionsSignalGenerator:
     # ------------------------------------------------------------------
     @staticmethod
     def put_call_ratio(chain_df: pd.DataFrame) -> float:
-        """看跌/看涨比率 — 以成交量代理 (mid 倒数加权)
+        """Put/call ratio, using a volume proxy weighted by the reciprocal of mid price.
 
-        用 1/mid 作为持仓量代理 (价格越低说明交易越投机),
-        分别对 put/call 求和并取比值。
-        高 PC 比 = 看空情绪。
+        1/mid stands in for open interest, on the reasoning that cheaper
+        contracts attract more speculative trading. Puts and calls are summed
+        separately and the ratio taken. A high put/call ratio reads as bearish.
 
         Parameters
         ----------
         chain_df : pd.DataFrame
-            process_chain 输出
+            Output of process_chain
 
         Returns
         -------
         float
-            Put/Call 比率
+            Put/call ratio
         """
         if chain_df.empty:
             return np.nan
@@ -476,19 +480,19 @@ class OptionsSignalGenerator:
     # ------------------------------------------------------------------
     @staticmethod
     def iv_rank(current_iv: float, iv_history: pd.Series) -> float:
-        """当前 IV 在历史区间中的百分位排名
+        """Percentile rank of the current IV within its own history.
 
         Parameters
         ----------
         current_iv : float
-            当前 ATM IV
+            Current ATM implied volatility
         iv_history : pd.Series
-            历史 IV 序列 (建议 252 个交易日 / 52 周)
+            Historical IV series (252 trading days / 52 weeks recommended)
 
         Returns
         -------
         float
-            0~1 之间的百分位; 0=历史最低, 1=历史最高
+            Percentile in [0, 1]; 0 is the historical low, 1 the historical high
         """
         if np.isnan(current_iv) or iv_history.dropna().empty:
             return np.nan
@@ -505,11 +509,12 @@ class OptionsSignalGenerator:
         chain_data: dict,
         prices: dict,
     ) -> pd.Series:
-        """多标的组合期权信号
+        """Cross-sectional option signal across multiple instruments.
 
-        对每个标的计算三个子因子, 加权合成后做截面排名映射到 [-1, 1]。
+        Computes three sub-factors per instrument, blends them by weight, then
+        cross-sectionally ranks the result onto [-1, 1].
 
-        权重: 40% iv_skew + 30% put_call_ratio + 30% iv_term_structure
+        Weights: 40% iv_skew + 30% put_call_ratio + 30% iv_term_structure
 
         Parameters
         ----------
@@ -521,7 +526,7 @@ class OptionsSignalGenerator:
         Returns
         -------
         pd.Series
-            index=ticker, values in [-1, 1], 正数看多 / 负数看空
+            index=ticker, values in [-1, 1]; positive is bullish, negative bearish
         """
         records = {}
 

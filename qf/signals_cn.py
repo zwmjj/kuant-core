@@ -1,38 +1,38 @@
-"""A股特色因子信号库 — 北向资金、涨停板动量、龙虎榜机构热度"""
+"""A-share specific factor signal library — northbound flow, limit-up momentum, dragon-tiger institutional attention"""
 import numpy as np
 import pandas as pd
 
 
 class ChinaSignalGenerator:
-    """A股特色因子信号的静态方法集合
+    """Collection of static methods for A-share specific factor signals
 
-    所有输入均为 pandas DataFrame，index=日期，columns=股票代码。
-    所有信号输出均经过 cross_sectional_rank 处理，值域 [-1, 1]。
+    All inputs are pandas DataFrames with index=date, columns=stock code.
+    All signal outputs pass through cross_sectional_rank and are bounded to [-1, 1].
 
-    因子列表:
-        1. northbound_flow_factor  — 北向资金净流入因子
-        2. limit_up_momentum       — 涨停板动量因子
-        3. institutional_attention — 机构调研/龙虎榜热度因子
+    Factor list:
+        1. northbound_flow_factor  — northbound net inflow factor
+        2. limit_up_momentum       — limit-up momentum factor
+        3. institutional_attention — institutional research / dragon-tiger attention factor
     """
 
     # ── 工具方法 ──
 
     @staticmethod
     def cross_sectional_rank(signal):
-        """截面排名，映射到 [-1, 1]
+        """Cross-sectional rank mapped to [-1, 1]
 
-        每日对所有股票进行百分比排名，然后线性映射到 [-1, 1]。
-        当某日有效股票数不足 10 只时，该日信号设为 NaN。
+        Ranks all stocks by percentile each day, then maps linearly to [-1, 1].
+        On days with fewer than 10 valid stocks the signal is set to NaN.
 
         Parameters
         ----------
         signal : pd.DataFrame
-            原始因子值，index=日期，columns=股票代码
+            Raw factor values, index=date, columns=stock code
 
         Returns
         -------
         pd.DataFrame
-            截面排名后的信号，值域 [-1, 1]
+            Cross-sectionally ranked signal, bounded to [-1, 1]
         """
         def rank_row(row):
             valid = row.dropna()
@@ -45,28 +45,28 @@ class ChinaSignalGenerator:
 
     @staticmethod
     def northbound_flow_factor(north_flow_df, prices):
-        """北向资金净流入因子 — 沪/深股通资金流向信号
+        """Northbound net inflow factor — Shanghai/Shenzhen Connect flow signal
 
-        核心逻辑:
-            1. 计算每只股票的北向资金 5日均值 和 20日均值
-            2. 短期/长期净流入变化率 = (5日均值 - 20日均值) / |20日均值|
-               反映北向资金的加速流入/流出趋势
-            3. 北向持续流入 = 外资看多信号
+        Core logic:
+            1. Compute each stock's 5-day and 20-day mean northbound flow
+            2. Short- vs long-term inflow change = (5-day mean - 20-day mean) / |20-day mean|
+               captures accelerating northbound inflow/outflow
+            3. Sustained northbound inflow = foreign investors bullish
 
         Parameters
         ----------
         north_flow_df : pd.DataFrame
-            北向资金每日净买入额，index=日期，columns=股票代码
-            正值表示净买入，负值表示净卖出，单位: 元
+            Daily northbound net buy amount, index=date, columns=stock code
+            Positive = net buying, negative = net selling, unit: CNY
         prices : pd.DataFrame
-            收盘价，index=日期，columns=股票代码
-            用于对齐日期和股票范围
+            Close prices, index=date, columns=stock code
+            Used to align the date and stock universe
 
         Returns
         -------
         pd.DataFrame
-            北向资金信号，index=日期，columns=股票代码，值域 [-1, 1]
-            正值 = 北向持续净买入(看多)，负值 = 北向持续净卖出(看空)
+            Northbound flow signal, index=date, columns=stock code, bounded to [-1, 1]
+            Positive = sustained northbound net buying (bullish), negative = sustained net selling (bearish)
         """
         # 对齐股票和日期
         common_cols = north_flow_df.columns.intersection(prices.columns)
@@ -91,28 +91,28 @@ class ChinaSignalGenerator:
 
     @staticmethod
     def limit_up_momentum(prices, volumes):
-        """涨停板动量因子 — A股涨停板制度下的强势股识别
+        """Limit-up momentum factor — identifying strong stocks under the A-share price limit regime
 
-        核心逻辑:
-            1. 涨停判断: 日涨幅 >= 9.8%（考虑四舍五入误差）
-            2. 统计过去 20 个交易日内涨停次数（频率分量）
-            3. 计算涨停后 3 日的平均涨幅（延续性分量）
-               涨停后继续上涨 = 主力封板坚决，不是骗炮
-            4. 两个分量等权合成
+        Core logic:
+            1. Limit-up detection: daily return >= 9.8% (allowing for rounding error)
+            2. Count limit-ups over the past 20 trading days (frequency component)
+            3. Average 3-day return following a limit-up (follow-through component)
+               Continued gains after a limit-up indicate genuine buying rather than a fake breakout
+            4. Combine the two components with equal weights
 
         Parameters
         ----------
         prices : pd.DataFrame
-            收盘价，index=日期，columns=股票代码
+            Close prices, index=date, columns=stock code
         volumes : pd.DataFrame
-            成交量，index=日期，columns=股票代码
-            用于辅助判断涨停的有效性（预留，当前版本未使用）
+            Trading volume, index=date, columns=stock code
+            Intended to help validate limit-ups (reserved, unused in the current version)
 
         Returns
         -------
         pd.DataFrame
-            涨停板动量信号，index=日期，columns=股票代码，值域 [-1, 1]
-            正值 = 近期涨停多且延续性强(强势股)
+            Limit-up momentum signal, index=date, columns=stock code, bounded to [-1, 1]
+            Positive = frequent recent limit-ups with strong follow-through (strong stock)
         """
         # 日收益率
         daily_ret = prices.pct_change()
@@ -154,31 +154,31 @@ class ChinaSignalGenerator:
 
     @staticmethod
     def institutional_attention(dragon_tiger_df, prices):
-        """机构调研/龙虎榜热度因子 — 基于龙虎榜数据的机构行为信号
+        """Institutional research / dragon-tiger attention factor — institutional behaviour signal from dragon-tiger list data
 
-        核心逻辑:
-            1. 基于龙虎榜数据，提取机构买入净额和出现频次
-            2. 20日指数衰减加权: 近期的龙虎榜事件权重更高
-               衰减半衰期 = 5日，即 5 天前的事件权重降为一半
-            3. 两个分量（净额 + 频次）等权合成
-            4. 机构持续买入 = 看多信号
+        Core logic:
+            1. Extract institutional net buy amount and appearance frequency from dragon-tiger list data
+            2. 20-day exponential decay weighting: recent dragon-tiger events carry more weight
+               Decay half-life = 5 days, so an event 5 days old carries half the weight
+            3. Combine the two components (net amount + frequency) with equal weights
+            4. Sustained institutional buying = bullish signal
 
         Parameters
         ----------
         dragon_tiger_df : pd.DataFrame
-            龙虎榜机构净买入额，index=日期，columns=股票代码
-            正值表示机构净买入，负值表示机构净卖出
-            非龙虎榜日期填 0 或 NaN
+            Institutional net buy amount from the dragon-tiger list, index=date, columns=stock code
+            Positive = institutional net buying, negative = institutional net selling
+            Dates without a dragon-tiger listing are filled with 0 or NaN
 
         prices : pd.DataFrame
-            收盘价，index=日期，columns=股票代码
-            用于对齐日期和股票范围
+            Close prices, index=date, columns=stock code
+            Used to align the date and stock universe
 
         Returns
         -------
         pd.DataFrame
-            机构热度信号，index=日期，columns=股票代码，值域 [-1, 1]
-            正值 = 机构持续买入(看多)，负值 = 机构持续卖出(看空)
+            Institutional attention signal, index=date, columns=stock code, bounded to [-1, 1]
+            Positive = sustained institutional buying (bullish), negative = sustained selling (bearish)
         """
         # 对齐
         common_cols = dragon_tiger_df.columns.intersection(prices.columns)
@@ -233,32 +233,32 @@ class ChinaSignalGenerator:
 
     @staticmethod
     def build_cn_signals(prices, volumes, north_flow, dragon_tiger, weights=None):
-        """构建A股特色复合因子信号
+        """Build the A-share specific composite factor signal
 
-        将三个A股特色因子加权合成为综合信号。
+        Combines the three A-share specific factors into a weighted composite signal.
 
         Parameters
         ----------
         prices : pd.DataFrame
-            收盘价，index=日期，columns=股票代码
+            Close prices, index=date, columns=stock code
         volumes : pd.DataFrame
-            成交量，index=日期，columns=股票代码
+            Trading volume, index=date, columns=stock code
         north_flow : pd.DataFrame
-            北向资金每日净买入额，index=日期，columns=股票代码
+            Daily northbound net buy amount, index=date, columns=stock code
         dragon_tiger : pd.DataFrame
-            龙虎榜机构净买入额，index=日期，columns=股票代码
+            Institutional net buy amount from the dragon-tiger list, index=date, columns=stock code
         weights : dict or None
-            因子名 → 权重的字典，默认等权。
-            可用键: 'northbound_flow', 'limit_up_momentum', 'institutional_attention'
+            Mapping of factor name → weight; equal weights by default.
+            Valid keys: 'northbound_flow', 'limit_up_momentum', 'institutional_attention'
 
         Returns
         -------
         dict
-            包含以下键:
-            - 'northbound_flow': 北向资金因子信号 DataFrame
-            - 'limit_up_momentum': 涨停板动量因子信号 DataFrame
-            - 'institutional_attention': 机构热度因子信号 DataFrame
-            - 'composite': 加权复合信号 DataFrame，值域 [-1, 1]
+            Contains the following keys:
+            - 'northbound_flow': northbound flow factor signal DataFrame
+            - 'limit_up_momentum': limit-up momentum factor signal DataFrame
+            - 'institutional_attention': institutional attention factor signal DataFrame
+            - 'composite': weighted composite signal DataFrame, bounded to [-1, 1]
         """
         sg = ChinaSignalGenerator
 
@@ -295,25 +295,25 @@ class ChinaSignalGenerator:
 # ── 便捷汇总函数 ──
 
 def build_cn_signals(prices, volumes, north_flow, dragon_tiger, weights=None):
-    """便捷函数 — 一次性计算全部A股特色因子
+    """Convenience function — compute all A-share specific factors in one call
 
     Parameters
     ----------
     prices : pd.DataFrame
-        收盘价，index=日期，columns=股票代码
+        Close prices, index=date, columns=stock code
     volumes : pd.DataFrame
-        成交量，index=日期，columns=股票代码
+        Trading volume, index=date, columns=stock code
     north_flow : pd.DataFrame
-        北向资金每日净买入额，index=日期，columns=股票代码
+        Daily northbound net buy amount, index=date, columns=stock code
     dragon_tiger : pd.DataFrame
-        龙虎榜机构净买入额，index=日期，columns=股票代码
+        Institutional net buy amount from the dragon-tiger list, index=date, columns=stock code
     weights : dict or None
-        因子权重字典，默认等权
+        Mapping of factor name to weight; equal weights by default
 
     Returns
     -------
     dict
-        信号名 → DataFrame 的字典
+        Mapping of signal name → DataFrame
     """
     return ChinaSignalGenerator.build_cn_signals(
         prices, volumes, north_flow, dragon_tiger, weights

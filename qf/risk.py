@@ -1,11 +1,11 @@
-"""风险分析 + 门控检查"""
+"""Risk analytics + gate checks"""
 import numpy as np
 import pandas as pd
 from scipy import stats
 
 
 class RiskAnalyzer:
-    """风险指标计算"""
+    """Risk metric computation"""
     def __init__(self, returns, pv=None):
         self.returns = returns
         self.pv = pv
@@ -74,12 +74,12 @@ class RiskAnalyzer:
 
 
 class GateCheck:
-    """门控检查管理器"""
+    """Gate check manager"""
     def __init__(self):
         self.results = []
 
     def check(self, name, value, threshold, comparison='>', category=''):
-        """添加一个门控检查"""
+        """Add a gate check"""
         if comparison == '>':
             passed = value > threshold
         elif comparison == '<':
@@ -102,7 +102,7 @@ class GateCheck:
         return passed
 
     def summary(self):
-        """返回汇总"""
+        """Return the summary"""
         n_pass = sum(1 for r in self.results if r['passed'])
         n_total = len(self.results)
         categories = {}
@@ -121,7 +121,7 @@ class GateCheck:
         }
 
     def run_standard_gates(self, metrics, risk_analyzer, is_sharpe=None, oos_sharpe=None, n_trials=20):
-        """运行标准门控检查"""
+        """Run the standard gate checks"""
         m = metrics
         self.check('Sharpe > 1.5', m['sharpe'], 1.5, '>', 'Backtest')
         self.check('MDD > -20%', m['max_drawdown'], -0.20, '>', 'Backtest')

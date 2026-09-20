@@ -1,4 +1,4 @@
-"""数据加载 — WRDS + 缓存 + 退市处理"""
+"""Data loading - WRDS + caching + delisting handling"""
 import os, pickle, warnings
 import wrds
 import pandas as pd
@@ -76,7 +76,7 @@ class DataLoader:
         return result
 
     def get_delisting_returns(self, start='2010-01-01', end='2024-12-31'):
-        """下载退市收益 — 修复幸存者偏差 (Shumway 1997)"""
+        """Download delisting returns to correct survivorship bias (Shumway 1997)."""
         cache_name = f"delist_{start}_{end}"
         cached = self._load_cache(cache_name)
         if cached is not None:
@@ -346,7 +346,7 @@ def _ensure_derived_fields(ccm_fund):
 
 
 def prepare_data(start='2000-01-01', end='2025-12-31'):
-    """加载全套数据，返回标准数据字典（含退市处理）"""
+    """Load the full dataset and return the standard data dictionary (delisting-adjusted)."""
     loader = DataLoader()
     data = loader.get_sp500_prices(start, end)
 

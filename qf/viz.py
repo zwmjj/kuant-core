@@ -1,4 +1,4 @@
-"""可视化模块 — 回测/风控/压力测试/门控 图表"""
+"""Visualization module — backtest / risk control / stress test / gate charts"""
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -17,7 +17,7 @@ COLORS = {'strategy': '#2196F3', 'benchmark': '#9E9E9E', 'positive': '#4CAF50',
 
 
 def plot_equity_curve(result, benchmark_returns=None, title="Equity Curve", save_path=None):
-    """净值曲线 + 基准对比"""
+    """Equity curve with benchmark comparison"""
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), height_ratios=[3, 1], sharex=True)
 
     # 净值
@@ -52,7 +52,7 @@ def plot_equity_curve(result, benchmark_returns=None, title="Equity Curve", save
 
 
 def plot_monthly_heatmap(result, title="Monthly Returns", save_path=None):
-    """月度收益热力图"""
+    """Monthly return heatmap"""
     rets = result.returns.copy()
     rets.index = pd.to_datetime(rets.index)
     df = pd.DataFrame({'year': rets.index.year, 'month': rets.index.month, 'ret': rets.values})
@@ -82,7 +82,7 @@ def plot_monthly_heatmap(result, title="Monthly Returns", save_path=None):
 
 
 def plot_return_distribution(returns, title="Return Distribution", save_path=None):
-    """收益分布 + VaR/CVaR标注"""
+    """Return distribution with VaR/CVaR annotations"""
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.hist(returns * 100, bins=30, color=COLORS['strategy'], alpha=0.6, edgecolor='white')
 
@@ -104,7 +104,7 @@ def plot_return_distribution(returns, title="Return Distribution", save_path=Non
 
 
 def plot_rolling_sharpe(returns, window=12, title="Rolling Sharpe", save_path=None):
-    """滚动Sharpe"""
+    """Rolling Sharpe"""
     rolling_sr = returns.rolling(window).mean() / returns.rolling(window).std() * np.sqrt(12)
     fig, ax = plt.subplots(figsize=(14, 5))
     ax.plot(rolling_sr.index, rolling_sr, color=COLORS['strategy'], linewidth=1.5)
@@ -126,7 +126,7 @@ def plot_rolling_sharpe(returns, window=12, title="Rolling Sharpe", save_path=No
 
 
 def plot_yearly_attribution(yearly_df, title="Yearly Attribution", save_path=None):
-    """年度收益对比柱状图"""
+    """Yearly return comparison bar chart"""
     fig, ax = plt.subplots(figsize=(14, 6))
     x = np.arange(len(yearly_df))
     w = 0.35
@@ -151,7 +151,7 @@ def plot_yearly_attribution(yearly_df, title="Yearly Attribution", save_path=Non
 
 
 def plot_gate_dashboard(gate_summary, title="Gate Check Dashboard", save_path=None):
-    """门控检查仪表盘 (交通灯)"""
+    """Gate check dashboard (traffic light)"""
     details = gate_summary['details']
     n = len(details)
     fig, ax = plt.subplots(figsize=(10, max(4, n * 0.45)))
@@ -186,7 +186,7 @@ def plot_gate_dashboard(gate_summary, title="Gate Check Dashboard", save_path=No
 
 
 def plot_stress_comparison(crisis_df, title="Crisis Replay", save_path=None):
-    """危机回放对比图"""
+    """Crisis replay comparison chart"""
     fig, ax = plt.subplots(figsize=(12, 6))
     x = np.arange(len(crisis_df))
     w = 0.35
@@ -206,7 +206,7 @@ def plot_stress_comparison(crisis_df, title="Crisis Replay", save_path=None):
 
 
 def plot_cost_sensitivity(cost_df, title="Cost Sensitivity", save_path=None):
-    """成本敏感度曲线"""
+    """Cost sensitivity curve"""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
     ax1.plot(cost_df['cost_bps'], cost_df['cagr'] * 100, 'o-', color=COLORS['strategy'], linewidth=2)
@@ -230,7 +230,7 @@ def plot_cost_sensitivity(cost_df, title="Cost Sensitivity", save_path=None):
 
 def generate_full_report(result, d, gate_summary=None, crisis_df=None,
                           cost_df=None, yearly_df=None, output_dir='reports'):
-    """一键生成全套可视化报告"""
+    """Generate the full visualization report in one call"""
     import os
     os.makedirs(output_dir, exist_ok=True)
 

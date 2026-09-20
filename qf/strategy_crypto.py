@@ -1,7 +1,7 @@
-"""加密货币交易策略 — 基于Alpaca加密货币数据的策略族
+"""Crypto trading strategies - a strategy family built on Alpaca crypto data
 
-支持的交易对: BTC/USD, ETH/USD, SOL/USD, DOGE/USD, AVAX/USD, LINK/USD, DOT/USD, ADA/USD
-数据格式: DataFrame, 列为 open, high, low, close, volume, trade_count, vwap (日线)
+Supported pairs: BTC/USD, ETH/USD, SOL/USD, DOGE/USD, AVAX/USD, LINK/USD, DOT/USD, ADA/USD
+Data format: DataFrame with columns open, high, low, close, volume, trade_count, vwap (daily)
 """
 
 import numpy as np
@@ -23,13 +23,13 @@ TRADING_DAYS_YEAR = 365  # 加密货币全年无休
 
 class CryptoBaseStrategy(ABC):
     """
-    加密货币策略基类。所有策略实现 generate_signal()。
+    Crypto strategy base class. Every strategy implements generate_signal().
 
-    用法:
+    Usage:
         class MyStrategy(CryptoBaseStrategy):
-            name = "我的加密策略"
+            name = "My Crypto Strategy"
             def generate_signal(self, data_dict):
-                return signal_df  # (date x symbol), 正=做多, 负=做空, 0=空仓
+                return signal_df  # (date x symbol), positive=long, negative=short, 0=flat
     """
     name: str = "未命名加密策略"
     description: str = ""
@@ -48,18 +48,18 @@ class CryptoBaseStrategy(ABC):
     @abstractmethod
     def generate_signal(self, data_dict: dict) -> pd.DataFrame:
         """
-        生成信号矩阵 (date x symbol)。
+        Generate the signal matrix (date x symbol).
 
-        参数:
-            data_dict: 字典, 键为交易对, 值为含 close/volume 等列的 DataFrame
+        Args:
+            data_dict: Dict keyed by trading pair, with DataFrames holding close/volume and other columns
 
-        返回:
-            pd.DataFrame — 行=日期, 列=交易对, 值=信号强度
+        Returns:
+            pd.DataFrame - rows=dates, columns=trading pairs, values=signal strength
         """
         raise NotImplementedError
 
     def get_params(self) -> dict:
-        """返回策略参数 (用于日志和报告)"""
+        """Return the strategy parameters (used for logging and reporting)."""
         return {
             'name': self.name,
             'symbols': self.symbols,
@@ -71,12 +71,12 @@ class CryptoBaseStrategy(ABC):
 
 class CryptoMomentumStrategy(CryptoBaseStrategy):
     """
-    加密货币截面动量策略。
+    Cross-sectional crypto momentum strategy.
 
-    逻辑:
-    - 计算20日收益率作为动量信号
-    - 跨交易对排名: 做多前3, 做空后2
-    - 反波动率加权: 持仓权重与波动率成反比
+    Logic:
+    - Use the 20-day return as the momentum signal
+    - Rank across pairs: long the top 3, short the bottom 2
+    - Inverse-volatility weighting: position weight is inversely proportional to volatility
     """
     name = "加密动量策略"
     description = "20日动量截面排名, 多空组合, 反波动率加权"
@@ -95,7 +95,7 @@ class CryptoMomentumStrategy(CryptoBaseStrategy):
         self.short_n = short_n
 
     def generate_signal(self, data_dict: dict) -> pd.DataFrame:
-        """生成截面动量信号, 反波动率加权。"""
+        """Generate cross-sectional momentum signals with inverse-volatility weighting."""
         # 构建收盘价矩阵
         close = _build_close_matrix(data_dict, self.symbols)
 
@@ -149,13 +149,13 @@ class CryptoMomentumStrategy(CryptoBaseStrategy):
 
 class CryptoMeanReversionStrategy(CryptoBaseStrategy):
     """
-    加密货币均值回归策略。
+    Crypto mean-reversion strategy.
 
-    逻辑:
-    - Z分数 = (close - 20日SMA) / 20日标准差
-    - Z < -2: 超卖, 买入信号
-    - Z > 2: 超买, 卖出信号
-    - 每个资产独立产生信号
+    Logic:
+    - Z-score = (close - 20-day SMA) / 20-day standard deviation
+    - Z < -2: oversold, buy signal
+    - Z > 2: overbought, sell signal
+    - Signals are generated independently per asset
     """
     name = "加密均值回归策略"
     description = "Z-score均值回归, 超买超卖阈值触发"
@@ -174,7 +174,7 @@ class CryptoMeanReversionStrategy(CryptoBaseStrategy):
         self.sell_threshold = sell_threshold
 
     def generate_signal(self, data_dict: dict) -> pd.DataFrame:
-        """生成均值回归信号, 基于Z分数。"""
+        """Generate mean-reversion signals from the Z-score."""
         close = _build_close_matrix(data_dict, self.symbols)
 
         sma = close.rolling(self.window).mean()
@@ -203,13 +203,13 @@ class CryptoMeanReversionStrategy(CryptoBaseStrategy):
 
 class CryptoTrendFollowStrategy(CryptoBaseStrategy):
     """
-    加密货币双均线趋势跟踪策略。
+    Crypto dual-moving-average trend-following strategy.
 
-    逻辑:
-    - 快线: 10日EMA; 慢线: 50日EMA
-    - 快线 > 慢线 → 做多
-    - 快线 < 慢线 → 做空/空仓
-    - 成交量确认: 交叉日成交量须高于20日均量
+    Logic:
+    - Fast line: 10-day EMA; slow line: 50-day EMA
+    - Fast > slow -> go long
+    - Fast < slow -> go short / stay flat
+    - Volume confirmation: volume on the crossover day must exceed the 20-day average volume
     """
     name = "加密趋势跟踪策略"
     description = "双EMA趋势跟踪, 成交量确认"
@@ -230,7 +230,7 @@ class CryptoTrendFollowStrategy(CryptoBaseStrategy):
         self.long_only = long_only
 
     def generate_signal(self, data_dict: dict) -> pd.DataFrame:
-        """生成双均线趋势信号, 含成交量确认。"""
+        """Generate dual-moving-average trend signals with volume confirmation."""
         close = _build_close_matrix(data_dict, self.symbols)
         volume = _build_field_matrix(data_dict, self.symbols, 'volume')
 
@@ -284,12 +284,12 @@ class CryptoTrendFollowStrategy(CryptoBaseStrategy):
 
 class CryptoBTCBetaStrategy(CryptoBaseStrategy):
     """
-    加密货币BTC Beta策略。
+    Crypto BTC beta strategy.
 
-    逻辑:
-    - 计算各山寨币对BTC的滚动beta
-    - BTC上升趋势 (20日SMA > 50日SMA): 做多高beta山寨币 (放大收益)
-    - BTC下降趋势: 做多低beta或做空高beta山寨币
+    Logic:
+    - Compute each altcoin's rolling beta to BTC
+    - BTC uptrend (20-day SMA > 50-day SMA): long high-beta altcoins (amplify returns)
+    - BTC downtrend: long low-beta altcoins or short high-beta ones
     """
     name = "加密BTC Beta策略"
     description = "基于BTC趋势和山寨币beta的轮动策略"
@@ -310,7 +310,7 @@ class CryptoBTCBetaStrategy(CryptoBaseStrategy):
         self.top_n = top_n
 
     def generate_signal(self, data_dict: dict) -> pd.DataFrame:
-        """根据BTC趋势和各币beta生成信号。"""
+        """Generate signals from the BTC trend and each coin's beta."""
         close = _build_close_matrix(data_dict, self.symbols)
         daily_ret = close.pct_change()
 
@@ -380,12 +380,13 @@ class CryptoBTCBetaStrategy(CryptoBaseStrategy):
 
 class CryptoVolTargetStrategy(CryptoBaseStrategy):
     """
-    加密货币波动率目标策略。
+    Crypto volatility-targeting strategy.
 
-    逻辑:
-    - 目标年化波动率15%
-    - 根据实际波动率反向调整仓位
-    - 叠加在动量或趋势信号上: 波动率高时降低仓位, 低时放大仓位
+    Logic:
+    - Target 15% annualized volatility
+    - Scale positions inversely to realized volatility
+    - Layered on top of a momentum or trend signal: cut positions when volatility is high,
+      scale them up when it is low
     """
     name = "加密波动率目标策略"
     description = "目标年化波动率15%, 仓位随实际波动率反向调整"
@@ -408,7 +409,7 @@ class CryptoVolTargetStrategy(CryptoBaseStrategy):
         )
 
     def generate_signal(self, data_dict: dict) -> pd.DataFrame:
-        """在内层策略信号上叠加波动率目标缩放。"""
+        """Apply volatility-target scaling on top of the inner strategy's signal."""
         # 获取内层策略信号
         raw_signal = self.inner_strategy.generate_signal(data_dict)
 
@@ -445,15 +446,15 @@ class CryptoVolTargetStrategy(CryptoBaseStrategy):
 
 def run_crypto_backtest(strategy, data_dict, initial_capital=10000):
     """
-    简单向量化加密货币日线回测。
+    Simple vectorized daily crypto backtest.
 
-    参数:
-        strategy: CryptoBaseStrategy 实例
-        data_dict: 字典 {symbol: DataFrame(close, volume, ...)}
-        initial_capital: 初始资金
+    Args:
+        strategy: A CryptoBaseStrategy instance
+        data_dict: Dict {symbol: DataFrame(close, volume, ...)}
+        initial_capital: Initial capital
 
-    返回:
-        dict 含 total_return, sharpe, max_drawdown, daily_returns, equity_curve
+    Returns:
+        dict with total_return, sharpe, max_drawdown, daily_returns, equity_curve
     """
     signals = strategy.generate_signal(data_dict)
     close = _build_close_matrix(data_dict, strategy.symbols)
@@ -505,14 +506,14 @@ def run_crypto_backtest(strategy, data_dict, initial_capital=10000):
 
 def prepare_crypto_data(alpaca_loader, lookback_days=365):
     """
-    从Alpaca获取加密货币数据并整理。
+    Fetch and normalize crypto data from Alpaca.
 
-    参数:
-        alpaca_loader: 带有 get_crypto_bars(symbol, timeframe, start, end) 方法的加载器
-        lookback_days: 回看天数
+    Args:
+        alpaca_loader: A loader exposing get_crypto_bars(symbol, timeframe, start, end)
+        lookback_days: Number of lookback days
 
-    返回:
-        dict — 键为交易对, 值为含 close/open/high/low/volume/vwap/returns 的 DataFrame
+    Returns:
+        dict - keyed by trading pair, with DataFrames holding close/open/high/low/volume/vwap/returns
     """
     end = pd.Timestamp.now(tz='UTC').normalize()
     start = end - pd.Timedelta(days=lookback_days)

@@ -1,7 +1,7 @@
-"""因子 IC/IR 衰减分析模块
+"""Factor IC/IR decay analysis module
 
-对所有日频因子进行 Information Coefficient (IC) 和 Information Ratio (IR) 分析，
-包括 IC 衰减曲线、因子排名、热力图和完整 tearsheet 报告。
+Runs Information Coefficient (IC) and Information Ratio (IR) analysis on all daily
+factors, including IC decay curves, factor rankings, heatmaps and full tearsheet reports.
 
 institutional-grade statistical rigor:
 - Newey-West HAC standard errors for IC t-stats
@@ -33,17 +33,17 @@ plt.rcParams["axes.unicode_minus"] = False
 
 
 class FactorAnalyzer:
-    """因子 IC/IR 衰减分析器
+    """Factor IC/IR decay analyzer
 
-    提供滚动 IC 计算、IR 指标、多滞后期 IC 衰减分析、
-    全因子排名比较、热力图和单因子 tearsheet 等功能。
+    Provides rolling IC computation, IR metrics, multi-lag IC decay analysis,
+    cross-factor ranking comparison, heatmaps and single-factor tearsheets.
 
     Parameters
     ----------
     method : str
-        IC 计算方法，'spearman'（秩相关，默认）或 'pearson'
+        IC computation method, 'spearman' (rank correlation, default) or 'pearson'
     min_obs : int
-        每期截面最少有效观测数，少于此数跳过该期
+        Minimum valid observations per cross-section; periods below this are skipped
     """
 
     def __init__(self, method: str = "spearman", min_obs: int = 20):
@@ -59,22 +59,23 @@ class FactorAnalyzer:
         factor: pd.DataFrame,
         returns: pd.DataFrame,
     ) -> pd.Series:
-        """计算滚动 IC (Information Coefficient) 时间序列
+        """Compute the rolling IC (Information Coefficient) time series
 
-        每期对因子截面值与下期收益做截面相关（Spearman / Pearson），
-        得到逐期 IC 序列。
+        For each period, correlates the cross-section of factor values with next-period
+        returns (Spearman / Pearson) to produce a per-period IC series.
 
         Parameters
         ----------
         factor : pd.DataFrame
-            因子值矩阵，index=日期，columns=股票代码
+            Factor value matrix, index=date, columns=stock code
         returns : pd.DataFrame
-            下期收益矩阵（需与 factor 对齐，即 returns[t] 是 factor[t] 的下期收益）
+            Next-period return matrix (must be aligned with factor, i.e. returns[t] is the
+            next-period return for factor[t])
 
         Returns
         -------
         pd.Series
-            以日期为索引的 IC 时间序列
+            IC time series indexed by date
         """
         common_dates = factor.index.intersection(returns.index)
         common_cols = factor.columns.intersection(returns.columns)
@@ -98,19 +99,20 @@ class FactorAnalyzer:
 
     @staticmethod
     def compute_ir(ic_series: pd.Series) -> float:
-        """计算 Information Ratio = mean(IC) / std(IC)
+        """Compute the Information Ratio = mean(IC) / std(IC)
 
-        IR 衡量因子预测能力的稳定性，|IR| > 0.5 通常认为是有效因子。
+        IR measures the stability of a factor's predictive power; |IR| > 0.5 is
+        generally considered an effective factor.
 
         Parameters
         ----------
         ic_series : pd.Series
-            IC 时间序列（由 compute_ic_series 产出）
+            IC time series (as produced by compute_ic_series)
 
         Returns
         -------
         float
-            Information Ratio；若 std(IC)==0 则返回 0.0
+            Information Ratio; returns 0.0 if std(IC) == 0
         """
         ic_clean = ic_series.dropna()
         if len(ic_clean) == 0 or ic_clean.std() == 0:
@@ -479,19 +481,19 @@ class FactorAnalyzer:
         returns: pd.DataFrame,
         lags: list = None,
     ) -> pd.DataFrame:
-        """计算不同滞后期的 IC 衰减
+        """Compute IC decay across different lags
 
-        对因子 factor[t] 分别与 returns[t+lag] 计算截面 IC，
-        观察随着持有期拉长，因子预测力如何衰减。
+        Computes the cross-sectional IC between factor[t] and returns[t+lag] for each lag,
+        showing how predictive power decays as the holding period lengthens.
 
         Parameters
         ----------
         factor : pd.DataFrame
-            因子值矩阵，index=日期，columns=股票代码
+            Factor value matrix, index=date, columns=stock code
         returns : pd.DataFrame
-            日收益矩阵（原始日收益，函数内部会按 lag 做 shift）
+            Daily return matrix (raw daily returns; the function shifts them by lag internally)
         lags : list of int
-            滞后天数列表，默认 [1, 2, 3, 5, 10, 20]
+            List of lag horizons in days, default [1, 2, 3, 5, 10, 20]
 
         Returns
         -------
@@ -561,23 +563,23 @@ class FactorAnalyzer:
         lags: list = None,
         top_n: int = 20,
     ) -> pd.DataFrame:
-        """对所有因子计算 IC / IR / IC衰减 / 换手率，返回排名 DataFrame
+        """Compute IC / IR / IC decay / turnover for all factors and return a ranking DataFrame
 
         Parameters
         ----------
         factors_dict : dict
-            因子名 -> 因子值 DataFrame 的字典
+            Mapping of factor name -> factor value DataFrame
         returns : pd.DataFrame
-            日收益矩阵
+            Daily return matrix
         lags : list of int
-            IC 衰减滞后期列表
+            List of IC decay lags
         top_n : int
-            换手率计算用的持仓数
+            Number of holdings used for the turnover computation
 
         Returns
         -------
         pd.DataFrame
-            index=因子名，columns 包含各项指标，按 |IC_mean| 降序排列
+            index=factor name, columns hold the individual metrics, sorted by |IC_mean| descending
         """
         if lags is None:
             lags = [1, 2, 3, 5, 10, 20]
@@ -623,16 +625,17 @@ class FactorAnalyzer:
         results: pd.DataFrame,
         save_path: str = None,
     ) -> plt.Figure:
-        """生成 IC 衰减热力图
+        """Generate the IC decay heatmap
 
-        横轴为滞后天数，纵轴为因子名称，颜色深浅表示 IC 大小。
+        The x-axis is the lag in days, the y-axis is the factor name, and color intensity
+        encodes IC magnitude.
 
         Parameters
         ----------
         results : pd.DataFrame
-            rank_all_factors 的输出
+            Output of rank_all_factors
         save_path : str or None
-            若指定则保存图片
+            If given, the figure is saved to this path
 
         Returns
         -------
@@ -683,21 +686,21 @@ class FactorAnalyzer:
         ic_series: pd.Series,
         save_path: str = None,
     ) -> plt.Figure:
-        """单因子分析图 — IC 时间序列 + IC 分布 + 累积IC
+        """Single-factor analysis chart — IC time series + IC distribution + cumulative IC
 
-        三张子图:
-        1. IC 时间序列折线图 + 20期滚动均值
-        2. IC 分布直方图
-        3. 累积 IC 曲线
+        Three subplots:
+        1. IC time series line chart + 20-period rolling mean
+        2. IC distribution histogram
+        3. Cumulative IC curve
 
         Parameters
         ----------
         factor_name : str
-            因子名称（用于标题）
+            Factor name (used in the title)
         ic_series : pd.Series
-            IC 时间序列
+            IC time series
         save_path : str or None
-            若指定则保存图片
+            If given, the figure is saved to this path
 
         Returns
         -------
@@ -767,30 +770,30 @@ class FactorAnalyzer:
         lags: list = None,
         top_n: int = 20,
     ) -> pd.DataFrame:
-        """生成完整因子分析报告
+        """Generate the full factor analysis report
 
-        包括:
-        - 全因子排名表（CSV）
-        - IC 衰减热力图（PNG）
-        - 每个因子的 tearsheet 图（PNG）
+        Includes:
+        - Cross-factor ranking table (CSV)
+        - IC decay heatmap (PNG)
+        - Per-factor tearsheet charts (PNG)
 
         Parameters
         ----------
         factors_dict : dict
-            因子名 -> 因子值 DataFrame
+            Mapping of factor name -> factor value DataFrame
         returns : pd.DataFrame
-            日收益矩阵
+            Daily return matrix
         output_dir : str
-            输出目录路径
+            Output directory path
         lags : list of int
-            IC 衰减滞后期列表
+            List of IC decay lags
         top_n : int
-            换手率持仓数
+            Number of holdings used for turnover
 
         Returns
         -------
         pd.DataFrame
-            全因子排名表
+            Cross-factor ranking table
         """
         if lags is None:
             lags = [1, 2, 3, 5, 10, 20]

@@ -1,4 +1,4 @@
-"""Screener信号生成器 — 基于Alpaca screener数据（最活跃/市场异动）"""
+"""Screener signal generator - built on Alpaca screener data (most actives / market movers)"""
 import numpy as np
 import pandas as pd
 from collections import Counter
@@ -14,9 +14,9 @@ def _cross_sectional_rank(s: pd.Series) -> pd.Series:
 
 
 class ScreenerSignalGenerator:
-    """基于Alpaca screener数据的信号集合
+    """A family of signals derived from Alpaca screener data.
 
-    Alpaca screener提供:
+    Alpaca's screener provides:
     - most_actives: [{'symbol': 'AAPL', 'volume': 1e8, 'trade_count': 5e5}, ...]
     - gainers/losers: [{'symbol': 'TSLA', 'percent_change': 5.2, 'price': 180.0}, ...]
     """
@@ -25,19 +25,21 @@ class ScreenerSignalGenerator:
 
     @staticmethod
     def attention_signal(most_actives: list, universe: list) -> pd.Series:
-        """注意力信号 — 高关注度股票倾向于短期动量（注意力驱动收益）
+        """Attention signal - heavily watched names tend to exhibit short-horizon
+        momentum (attention-driven returns).
 
         Parameters
         ----------
         most_actives : list[dict]
-            Alpaca most_actives数据，含 symbol, volume, trade_count
-            按volume降序排列
+            Alpaca most_actives data with symbol, volume, trade_count,
+            sorted by volume descending
         universe : list[str]
-            投资宇宙中的标的列表
+            Instruments in the investable universe
 
         Returns
         -------
-        pd.Series : 截面排名归一化到 [-1, 1]，未在most_actives中的为0
+        pd.Series : cross-sectional rank scaled to [-1, 1]; names absent from
+            most_actives score 0
         """
         signal = pd.Series(0.0, index=universe)
 
@@ -64,22 +66,23 @@ class ScreenerSignalGenerator:
 
     @staticmethod
     def momentum_signal(gainers: list, losers: list, universe: list) -> pd.Series:
-        """短期趋势延续动量信号 — gainers给正信号，losers给负信号
+        """Short-horizon trend-continuation signal - long gainers, short losers.
 
-        逻辑: 日内大涨/大跌股票在次日有延续效应（短期动量）
+        Rationale: names with large intraday moves tend to continue in the
+        same direction the following day (short-horizon momentum).
 
         Parameters
         ----------
         gainers : list[dict]
-            含 symbol, percent_change, price
+            With symbol, percent_change, price
         losers : list[dict]
-            含 symbol, percent_change, price（percent_change为负值）
+            With symbol, percent_change, price (percent_change is negative)
         universe : list[str]
-            投资宇宙
+            Investable universe
 
         Returns
         -------
-        pd.Series : 截面排名归一化到 [-1, 1]
+        pd.Series : cross-sectional rank scaled to [-1, 1]
         """
         signal = pd.Series(0.0, index=universe)
 
@@ -105,22 +108,23 @@ class ScreenerSignalGenerator:
 
     @staticmethod
     def contrarian_signal(gainers: list, losers: list, universe: list) -> pd.Series:
-        """均值回归反转信号 — losers给正信号（超卖反弹），gainers给负信号
+        """Mean-reversion signal - long losers (oversold bounce), short gainers.
 
-        极端波动(>5%)时效果更佳（过度反应修正）
+        Works best after extreme moves (>5%), where it captures the correction
+        of an overreaction.
 
         Parameters
         ----------
         gainers : list[dict]
-            含 symbol, percent_change, price
+            With symbol, percent_change, price
         losers : list[dict]
-            含 symbol, percent_change, price
+            With symbol, percent_change, price
         universe : list[str]
-            投资宇宙
+            Investable universe
 
         Returns
         -------
-        pd.Series : 截面排名归一化到 [-1, 1]
+        pd.Series : cross-sectional rank scaled to [-1, 1]
         """
         signal = pd.Series(0.0, index=universe)
 
@@ -151,23 +155,27 @@ class ScreenerSignalGenerator:
 
     @staticmethod
     def trade_intensity_signal(most_actives: list, universe: list) -> pd.Series:
-        """交易强度信号 — trade_count/volume比率区分散户vs机构
+        """Trade-intensity signal - the trade_count/volume ratio separates retail
+        from institutional flow.
 
-        高trade_count/volume = 小单多 = 散户兴趣（噪音交易者）
-        低trade_count/volume = 大单多 = 机构大宗交易（信息交易者）
+        High trade_count/volume = many small tickets = retail interest
+        (noise traders).
+        Low trade_count/volume = few large tickets = institutional block
+        trading (informed traders).
 
-        信号方向: 机构参与度高（低比率）=> 正信号
+        Signal direction: high institutional participation (a low ratio)
+        produces a positive score.
 
         Parameters
         ----------
         most_actives : list[dict]
-            含 symbol, volume, trade_count
+            With symbol, volume, trade_count
         universe : list[str]
-            投资宇宙
+            Investable universe
 
         Returns
         -------
-        pd.Series : 截面排名归一化到 [-1, 1]
+        pd.Series : cross-sectional rank scaled to [-1, 1]
         """
         signal = pd.Series(np.nan, index=universe)
 
@@ -197,19 +205,22 @@ class ScreenerSignalGenerator:
 
     @staticmethod
     def persistence_signal(actives_history: list, days: int = 5) -> pd.Series:
-        """持续关注度信号 — 多日连续出现在most_actives中表示持续机构兴趣
+        """Persistence signal - appearing in most_actives on consecutive days
+        indicates sustained institutional interest.
 
         Parameters
         ----------
         actives_history : list[list[dict]]
-            最近N天的most_actives数据列表，每个元素是一天的most_actives
-            actives_history[0] = 最近一天, actives_history[-1] = 最早一天
+            The last N days of most_actives data, one element per day.
+            actives_history[0] is the most recent day, actives_history[-1]
+            the oldest.
         days : int
-            统计窗口天数（默认5天）
+            Length of the counting window in days (default 5)
 
         Returns
         -------
-        pd.Series : 出现频率越高信号越强，截面排名归一化到 [-1, 1]
+        pd.Series : the more often a name appears the stronger the score;
+            cross-sectional rank scaled to [-1, 1]
         """
         if not actives_history:
             return pd.Series(dtype=float)
@@ -263,22 +274,22 @@ class ScreenerSignalGenerator:
         w_contrarian: float = 0.2,
         w_intensity: float = 0.2,
     ) -> pd.Series:
-        """综合screener信号 — 加权合成所有子信号
+        """Composite screener signal - a weighted blend of every sub-signal.
 
         Parameters
         ----------
         most_actives : list[dict]
-            Alpaca most_actives数据
+            Alpaca most_actives data
         gainers, losers : list[dict]
-            Alpaca市场异动数据
+            Alpaca market-mover data
         universe : list[str]
-            投资宇宙
+            Investable universe
         w_attention, w_momentum, w_contrarian, w_intensity : float
-            各子信号权重，默认 0.3/0.3/0.2/0.2
+            Weight on each sub-signal, default 0.3/0.3/0.2/0.2
 
         Returns
         -------
-        pd.Series : 截面排名归一化到 [-1, 1] 的综合信号
+        pd.Series : composite signal, cross-sectionally ranked to [-1, 1]
         """
         gen = ScreenerSignalGenerator
 
@@ -300,17 +311,17 @@ class ScreenerSignalGenerator:
 
     @staticmethod
     def daily_screener_pipeline(alpaca_loader) -> dict:
-        """日度screener信号流水线 — 从Alpaca获取数据并计算所有信号
+        """Daily screener pipeline - pull the data from Alpaca and compute every signal.
 
         Parameters
         ----------
         alpaca_loader : object
-            需要提供以下方法:
+            Must provide the following methods:
             - get_most_actives() -> list[dict]
             - get_gainers() -> list[dict]
             - get_losers() -> list[dict]
             - get_universe() -> list[str]
-            - get_actives_history(days) -> list[list[dict]]  (可选)
+            - get_actives_history(days) -> list[list[dict]]  (optional)
 
         Returns
         -------

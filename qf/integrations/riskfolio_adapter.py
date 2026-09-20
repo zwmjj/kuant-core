@@ -1,7 +1,7 @@
-"""Riskfolio-Lib 投资组合优化适配器
+"""Riskfolio-Lib portfolio optimization adapter
 Riskfolio-Lib: https://github.com/dcajasn/Riskfolio-Lib
-提供均值-方差、风险平价、HRP 等多种组合优化方法,
-支持多种风险度量 (CVaR, CDaR, EVaR 等)。
+Provides mean-variance, risk parity, HRP and other portfolio optimization methods,
+with support for a range of risk measures (CVaR, CDaR, EVaR, etc.).
 """
 import warnings
 import numpy as np
@@ -39,36 +39,36 @@ def optimize_portfolio(
     target_return: Optional[float] = None,
     constraints: Optional[dict] = None,
 ) -> dict:
-    """使用 Riskfolio-Lib 优化投资组合权重。
+    """Optimize portfolio weights using Riskfolio-Lib.
 
     Parameters
     ----------
     returns : pd.DataFrame
-        资产收益矩阵 (date x asset)
+        Asset return matrix (date x asset)
     method : str
-        优化方法:
-        - 'MV' : 均值-方差 (Mean-Variance)
-        - 'RP' : 风险平价 (Risk Parity)
-        - 'HRP': 层次风险平价 (Hierarchical Risk Parity)
+        Optimization method:
+        - 'MV' : Mean-Variance
+        - 'RP' : Risk Parity
+        - 'HRP': Hierarchical Risk Parity
     risk_measure : str
-        风险度量:
-        - 'MV'   : 方差 (Variance)
-        - 'CVaR' : 条件VaR
-        - 'CDaR' : 条件最大回撤
-        - 'EVaR' : 熵VaR
-        - 'MAD'  : 平均绝对偏差
+        Risk measure:
+        - 'MV'   : Variance
+        - 'CVaR' : Conditional VaR
+        - 'CDaR' : Conditional Drawdown at Risk
+        - 'EVaR' : Entropic VaR
+        - 'MAD'  : Mean Absolute Deviation
     objective : str
-        优化目标 (仅 MV 方法):
-        - 'Sharpe'    : 最大化夏普比率
-        - 'MinRisk'   : 最小化风险
-        - 'MaxRet'    : 最大化收益 (给定风险约束)
-        - 'Utility'   : 最大化效用函数
+        Optimization objective (MV method only):
+        - 'Sharpe'    : maximize the Sharpe ratio
+        - 'MinRisk'   : minimize risk
+        - 'MaxRet'    : maximize return (subject to a risk constraint)
+        - 'Utility'   : maximize the utility function
     risk_free_rate : float
-        无风险利率
+        Risk-free rate
     target_return : float, optional
-        目标收益率 (仅 MaxRet 使用)
+        Target return (used by MaxRet only)
     constraints : dict, optional
-        额外约束, 如 {'upper_bound': 0.1} 限制单资产最大权重
+        Extra constraints, e.g. {'upper_bound': 0.1} to cap the weight of any single asset
 
     Returns
     -------
@@ -227,18 +227,18 @@ def compute_efficient_frontier(
     n_points: int = 50,
     risk_free_rate: float = 0.0,
 ) -> dict:
-    """计算有效前沿。
+    """Compute the efficient frontier.
 
     Parameters
     ----------
     returns : pd.DataFrame
-        资产收益矩阵
+        Asset return matrix
     risk_measure : str
-        风险度量
+        Risk measure
     n_points : int
-        有效前沿点数
+        Number of points on the frontier
     risk_free_rate : float
-        无风险利率
+        Risk-free rate
 
     Returns
     -------
@@ -307,14 +307,14 @@ def compare_optimization_methods(
     returns: pd.DataFrame,
     risk_free_rate: float = 0.0,
 ) -> dict:
-    """比较不同优化方法的结果。
+    """Compare the results of different optimization methods.
 
     Parameters
     ----------
     returns : pd.DataFrame
-        资产收益矩阵
+        Asset return matrix
     risk_free_rate : float
-        无风险利率
+        Risk-free rate
 
     Returns
     -------

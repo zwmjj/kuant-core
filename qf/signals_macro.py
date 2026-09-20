@@ -1,4 +1,4 @@
-"""宏观与跨资产因子信号库 — 利用宏观指标(黄金、原油、债券、波动率、行业ETF)进行股票选择"""
+"""Macro and cross-asset factor signal library - stock selection driven by macro indicators (gold, crude oil, bonds, volatility, sector ETFs)."""
 import numpy as np
 import pandas as pd
 
@@ -13,11 +13,12 @@ SECTOR_ETFS = ['XLE', 'XLF', 'XLK', 'XLV', 'XLU', 'XLP']
 
 
 class MacroSignalGenerator:
-    """宏观与跨资产因子信号的静态方法集合
+    """Collection of static methods producing macro and cross-asset factor signals
 
-    stock_returns: DataFrame, index=日期, columns=股票代码, 值=日收益率
-    macro_data中各列为宏观ETF的日收益率(或价格，视方法而定)。
-    所有信号输出均经过 cross_sectional_rank 处理，值域 [-1, 1]。
+    stock_returns: DataFrame with index=date, columns=ticker, values=daily returns
+    Each column of macro_data holds a macro ETF's daily returns (or prices, depending
+    on the method).
+    All signal outputs pass through cross_sectional_rank and lie in [-1, 1].
     """
 
     # ══════════════════════════════════════════════════════════════
@@ -26,7 +27,7 @@ class MacroSignalGenerator:
 
     @staticmethod
     def cross_sectional_rank(signal):
-        """截面排名，映射到 [-1, 1]"""
+        """Cross-sectional rank, mapped to [-1, 1]."""
         def rank_row(row):
             valid = row.dropna()
             if len(valid) < 10:
@@ -68,23 +69,25 @@ class MacroSignalGenerator:
 
     @staticmethod
     def rate_sensitivity(stock_returns, tlt_returns, window=60):
-        """利率敏感性 — 股票对TLT(长债)的滚动beta
+        """Rate sensitivity - rolling beta of a stock to TLT (long-duration Treasuries)
 
-        负beta表示利率敏感型成长股，加息周期中表现差。
-        正beta表示与债券正相关的防御型股票。
-        返回截面排名后的信号，高值=高利率敏感性。
+        A negative beta marks a rate-sensitive growth stock that underperforms in
+        hiking cycles.
+        A positive beta marks a defensive stock that moves with bonds.
+        Returns the cross-sectionally ranked signal; high values = high rate sensitivity.
         """
         betas = MacroSignalGenerator._rolling_beta(stock_returns, tlt_returns, window)
         return MacroSignalGenerator.cross_sectional_rank(betas)
 
     @staticmethod
     def real_yield_regime(gld_returns, tlt_returns, window=20):
-        """实际收益率环境判断 — 黄金涨+债券跌=实际收益率上升
+        """Real yield regime - gold up + bonds down = rising real yields
 
-        返回 Series (T,)，值域 [-1, 1]:
-          正值 = 实际收益率上升环境(不利于成长股)
-          负值 = 实际收益率下降环境(有利于成长股)
-        应配合 rate_sensitivity 使用：实际收益率上升时，避开高TLT-beta股票。
+        Returns a Series (T,) in [-1, 1]:
+          Positive = rising real yield regime (unfavorable for growth stocks)
+          Negative = falling real yield regime (favorable for growth stocks)
+        Intended to be used with rate_sensitivity: avoid high TLT-beta stocks when
+        real yields are rising.
         """
         # 黄金相对债券的强弱 = gold涨 + bond跌 → 实际收益率上升
         spread = gld_returns - tlt_returns
@@ -100,28 +103,30 @@ class MacroSignalGenerator:
 
     @staticmethod
     def oil_beta(stock_returns, uso_returns, window=60):
-        """原油暴露 — 股票对USO(原油ETF)的滚动beta
+        """Oil exposure - rolling beta of a stock to USO (crude oil ETF)
 
-        高beta = 能源相关敞口大。能源牛市中有利。
+        High beta = large energy-related exposure. Favorable in energy bull markets.
         """
         betas = MacroSignalGenerator._rolling_beta(stock_returns, uso_returns, window)
         return MacroSignalGenerator.cross_sectional_rank(betas)
 
     @staticmethod
     def gold_beta(stock_returns, gld_returns, window=60):
-        """黄金暴露 — 股票对GLD(黄金ETF)的滚动beta
+        """Gold exposure - rolling beta of a stock to GLD (gold ETF)
 
-        高beta = 黄金对冲属性。避险环境中有利。
+        High beta = gold-hedge characteristics. Favorable in risk-off regimes.
         """
         betas = MacroSignalGenerator._rolling_beta(stock_returns, gld_returns, window)
         return MacroSignalGenerator.cross_sectional_rank(betas)
 
     @staticmethod
     def commodity_regime_tilt(stock_returns, dbc_returns, window=20):
-        """商品趋势择时倾斜 — 商品上涨趋势中偏好高商品beta股
+        """Commodity trend timing tilt - favor high commodity-beta stocks in commodity uptrends
 
-        先判断DBC趋势方向，再计算股票对DBC的beta。
-        商品上涨期：高beta得分高。商品下跌期：低beta得分高(信号翻转)。
+        First determines the direction of the DBC trend, then computes each stock's
+        beta to DBC.
+        In commodity uptrends high beta scores highly; in downtrends low beta scores
+        highly (the signal flips).
         """
         # 商品趋势判断
         trend = dbc_returns.rolling(window, min_periods=window // 2).mean()
@@ -140,9 +145,9 @@ class MacroSignalGenerator:
 
     @staticmethod
     def vix_beta(stock_returns, spy_returns, window=60):
-        """下行beta — 仅用SPY下跌日计算的beta(VIX代理)
+        """Downside beta - beta computed only on SPY down days (a VIX proxy)
 
-        高下行beta = 崩盘易损型股票。恐慌时跌幅更大。
+        High downside beta = crash-vulnerable stock that falls harder in panics.
         """
         # 仅保留SPY下跌日
         mask = spy_returns < 0
@@ -154,9 +159,10 @@ class MacroSignalGenerator:
 
     @staticmethod
     def vol_regime_tilt(stock_returns, spy_returns, window=20):
-        """波动率环境择时倾斜 — 高波动环境偏好低beta，低波动环境偏好高beta
+        """Volatility regime timing tilt - favor low beta in high-vol regimes and high beta in low-vol regimes
 
-        用SPY已实现波动率判断波动环境，结合个股beta做择时。
+        Uses SPY realized volatility to classify the regime and combines it with each
+        stock's beta for timing.
         """
         # 已实现波动率
         realized_vol = spy_returns.rolling(window, min_periods=window // 2).std() * np.sqrt(252)
@@ -173,10 +179,12 @@ class MacroSignalGenerator:
 
     @staticmethod
     def correlation_regime(stock_returns, spy_returns, window=60):
-        """滚动相关性环境 — 个股与大盘的滚动相关系数
+        """Rolling correlation regime - rolling correlation between a stock and the market
 
-        高相关性环境下，只有低相关性(特异性)股票能提供分散化价值。
-        返回: 负相关性排名 → 高值=低相关性=更有特异性价值。
+        In high-correlation regimes only low-correlation (idiosyncratic) stocks offer
+        diversification value.
+        Returns: the negated correlation rank -> high values = low correlation = more
+        idiosyncratic value.
         """
         spy_aligned = spy_returns.reindex(stock_returns.index)
         corrs = pd.DataFrame(np.nan, index=stock_returns.index, columns=stock_returns.columns)
@@ -193,30 +201,30 @@ class MacroSignalGenerator:
 
     @staticmethod
     def sector_momentum(sector_etf_returns, window=20):
-        """行业动量 — 行业ETF的截面动量排名
+        """Sector momentum - cross-sectional momentum rank of sector ETFs
 
-        返回 DataFrame, index=日期, columns=行业ETF代码, 值=[-1,1]排名。
-        通过个股对行业ETF的beta映射到个股层面。
+        Returns a DataFrame with index=date, columns=sector ETF ticker, values=[-1,1] ranks.
+        Mapped down to individual stocks via each stock's beta to the sector ETF.
         """
         cum_ret = sector_etf_returns.rolling(window, min_periods=window // 2).sum()
         return MacroSignalGenerator.cross_sectional_rank(cum_ret)
 
     @staticmethod
     def sector_mean_reversion(sector_etf_returns, window=5):
-        """行业短期反转 — 短窗口行业ETF收益的反向信号
+        """Sector short-term reversal - contrarian signal on short-window sector ETF returns
 
-        过去5日涨幅最大的行业短期内倾向反转。
+        Sectors with the largest gains over the past 5 days tend to revert in the short run.
         """
         cum_ret = sector_etf_returns.rolling(window, min_periods=max(window // 2, 3)).sum()
         return MacroSignalGenerator.cross_sectional_rank(-cum_ret)
 
     @staticmethod
     def defensive_tilt(spy_returns, window=20):
-        """防御性倾斜 — SPY趋势为负时偏好防御型股票
+        """Defensive tilt - favor defensive stocks when the SPY trend is negative
 
-        返回 Series (T,)，值域 [-1, 1]:
-          负值 = SPY下行趋势 → 应超配公用事业/必需消费/医疗(低beta)
-          正值 = SPY上行趋势 → 可超配进攻型(高beta)
+        Returns a Series (T,) in [-1, 1]:
+          Negative = SPY downtrend -> overweight utilities/staples/healthcare (low beta)
+          Positive = SPY uptrend -> overweight cyclicals (high beta)
         """
         trend = spy_returns.rolling(window, min_periods=window // 2).mean()
         trend_z = (trend - trend.rolling(252, min_periods=60).mean()) \
@@ -229,11 +237,11 @@ class MacroSignalGenerator:
 
     @staticmethod
     def risk_appetite(spy_returns, gld_returns, window=20):
-        """风险偏好指标 — SPY/GLD比值趋势
+        """Risk appetite indicator - trend in the SPY/GLD ratio
 
-        SPY相对GLD走强 = risk-on → 偏好高beta股票
-        SPY相对GLD走弱 = risk-off → 偏好低beta/防御股
-        返回 Series (T,)，值域 [-1, 1]。
+        SPY strengthening against GLD = risk-on -> favor high-beta stocks
+        SPY weakening against GLD = risk-off -> favor low-beta/defensive stocks
+        Returns a Series (T,) in [-1, 1].
         """
         spread = spy_returns - gld_returns
         trend = spread.rolling(window, min_periods=window // 2).mean()
@@ -243,10 +251,10 @@ class MacroSignalGenerator:
 
     @staticmethod
     def dollar_regime(uup_returns, window=20):
-        """美元环境 — 强美元不利于跨国公司
+        """Dollar regime - a strong dollar hurts multinationals
 
-        UUP上涨趋势 = 强美元 → 偏好内需型股票
-        返回 Series (T,)，值域 [-1, 1]。正值=强美元环境。
+        UUP in an uptrend = strong dollar -> favor domestically oriented stocks
+        Returns a Series (T,) in [-1, 1]. Positive = strong-dollar regime.
         """
         trend = uup_returns.rolling(window, min_periods=window // 2).mean()
         trend_z = (trend - trend.rolling(252, min_periods=60).mean()) \
@@ -255,10 +263,10 @@ class MacroSignalGenerator:
 
     @staticmethod
     def credit_spread_proxy(hyg_returns, tlt_returns, window=20):
-        """信用利差代理 — HYG-TLT利差走势
+        """Credit spread proxy - trend in the HYG-TLT spread
 
-        HYG相对TLT走弱 = 信用利差扩大 = risk-off
-        返回 Series (T,)，值域 [-1, 1]。负值=risk-off(利差扩大)。
+        HYG weakening against TLT = widening credit spreads = risk-off
+        Returns a Series (T,) in [-1, 1]. Negative = risk-off (spreads widening).
         """
         spread = hyg_returns - tlt_returns
         trend = spread.rolling(window, min_periods=window // 2).mean()
@@ -272,19 +280,19 @@ class MacroSignalGenerator:
 
     @staticmethod
     def build_macro_signal(stock_returns, macro_data, regime='auto'):
-        """自动检测宏观环境并构建综合宏观信号
+        """Detect the macro regime automatically and build a composite macro signal
 
-        参数:
-            stock_returns: DataFrame (T x N), 个股日收益率
-            macro_data: DataFrame, 列为各宏观ETF日收益率
-            regime: 'auto'自动检测 | 'risk_on' | 'risk_off' | 'neutral'
+        Args:
+            stock_returns: DataFrame (T x N), daily stock returns
+            macro_data: DataFrame whose columns are the daily returns of each macro ETF
+            regime: 'auto' for automatic detection | 'risk_on' | 'risk_off' | 'neutral'
 
-        返回: DataFrame (T x N), 综合宏观择股信号 [-1, 1]
+        Returns: DataFrame (T x N), composite macro stock-selection signal in [-1, 1]
 
-        自动环境检测逻辑:
-          - risk_on: SPY趋势向上 + 信用利差收窄
-          - risk_off: SPY趋势向下 + 信用利差扩大
-          - neutral: 其他
+        Automatic regime detection logic:
+          - risk_on: SPY trending up + credit spreads tightening
+          - risk_off: SPY trending down + credit spreads widening
+          - neutral: everything else
         """
         sg = MacroSignalGenerator
         spy = sg._safe_get(macro_data, 'SPY')
@@ -375,15 +383,15 @@ class MacroSignalGenerator:
 
     @staticmethod
     def prepare_macro_signals(stock_returns, macro_data):
-        """计算所有宏观因子信号，返回字典
+        """Compute every macro factor signal and return them as a dict
 
-        参数:
-            stock_returns: DataFrame (T x N), 个股日收益率
-            macro_data: DataFrame, 列为各宏观ETF日收益率
+        Args:
+            stock_returns: DataFrame (T x N), daily stock returns
+            macro_data: DataFrame whose columns are the daily returns of each macro ETF
 
-        返回: dict[str, DataFrame/Series]
-            键为信号名称，值为对应的信号DataFrame或Series。
-            缺失的宏观数据对应的信号会被跳过。
+        Returns: dict[str, DataFrame/Series]
+            Keys are signal names, values are the corresponding signal DataFrame or Series.
+            Signals whose macro inputs are missing are skipped.
         """
         sg = MacroSignalGenerator
         results = {}

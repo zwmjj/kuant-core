@@ -1,4 +1,4 @@
-"""实时风险管理系统 — 多资产组合的全面风控"""
+"""Real-time risk management system — comprehensive risk control for multi-asset portfolios"""
 import os
 import csv
 import datetime
@@ -85,17 +85,17 @@ _DEFAULT_GREEK_LIMITS = {
 
 class RiskManager:
     """
-    实时风险管理器
+    Real-time risk manager
 
-    集成持仓级、组合级、动态限额、期权希腊字母、告警与执行动作。
-    可与 AutoTrader 对接: ``evaluate()`` 返回的动作字典可直接执行。
+    Combines position-level and portfolio-level checks, dynamic limits, option Greeks, alerts, and execution actions.
+    Integrates with AutoTrader: the action dicts returned by ``evaluate()`` can be executed directly.
 
     Parameters
     ----------
     risk_log_path : str
-        风险日志 CSV 路径，默认 ``risk_log.csv``
+        Path to the risk log CSV, defaults to ``risk_log.csv``
     greek_limits : dict, optional
-        期权希腊字母限额覆盖
+        Overrides for the option Greek limits
     """
 
     def __init__(
@@ -142,19 +142,19 @@ class RiskManager:
         equity: float,
     ) -> List[Tuple[str, str, float]]:
         """
-        检查单一持仓是否超过组合净值的 10%
+        Check whether any single position exceeds 10% of portfolio equity
 
         Parameters
         ----------
         positions : dict
             {ticker: market_value, ...}
         equity : float
-            组合净值
+            Portfolio equity
 
         Returns
         -------
         list of (ticker, level, weight)
-            超限持仓列表
+            Positions that breach the limit
         """
         alerts: List[Tuple[str, str, float]] = []
         if equity <= 0:
@@ -172,7 +172,7 @@ class RiskManager:
         positions: Dict[str, Dict[str, Any]],
     ) -> List[Tuple[str, str, float]]:
         """
-        检查行业集中度，单一行业不超过 30%
+        Check sector concentration; no single sector may exceed 30%
 
         Parameters
         ----------
@@ -208,18 +208,18 @@ class RiskManager:
         top_n: int = 10,
     ) -> List[Tuple[str, str, float]]:
         """
-        检查头部持仓间相关性，高度相关(>0.7)则告警
+        Check correlation between the largest positions; alert when highly correlated (>0.7)
 
         Parameters
         ----------
         positions : dict
             {ticker: market_value, ...}
         returns : DataFrame
-            历史收益率, 列为 ticker
+            Historical returns, columns are tickers
         threshold : float
-            相关性告警阈值
+            Correlation alert threshold
         top_n : int
-            只检查最大的 N 个持仓
+            Only check the N largest positions
 
         Returns
         -------
@@ -255,21 +255,21 @@ class RiskManager:
         confidence: float = 0.95,
     ) -> float:
         """
-        估算单一持仓的 VaR（历史法）
+        Estimate the VaR of a single position (historical method)
 
         Parameters
         ----------
         position_value : float
-            持仓市值
+            Position market value
         returns : Series
-            该资产的历史日收益率
+            Historical daily returns of the asset
         confidence : float
-            置信度
+            Confidence level
 
         Returns
         -------
         float
-            VaR 金额（负值表示损失）
+            VaR amount (negative means loss)
         """
         if len(returns) < 20:
             return 0.0
@@ -286,19 +286,19 @@ class RiskManager:
         confidence: float = 0.99,
     ) -> float:
         """
-        组合历史 VaR
+        Portfolio historical VaR
 
         Parameters
         ----------
         portfolio_returns : Series
-            组合日收益率
+            Portfolio daily returns
         confidence : float
-            置信度
+            Confidence level
 
         Returns
         -------
         float
-            VaR（负值）
+            VaR (negative)
         """
         if len(portfolio_returns) < 20:
             return 0.0
@@ -310,19 +310,19 @@ class RiskManager:
         confidence: float = 0.99,
     ) -> float:
         """
-        组合条件 VaR（预期尾部损失）
+        Portfolio conditional VaR (expected tail loss)
 
         Parameters
         ----------
         portfolio_returns : Series
-            组合日收益率
+            Portfolio daily returns
         confidence : float
-            置信度
+            Confidence level
 
         Returns
         -------
         float
-            CVaR（负值）
+            CVaR (negative)
         """
         var = self.portfolio_var(portfolio_returns, confidence)
         tail = portfolio_returns[portfolio_returns <= var]
@@ -334,18 +334,18 @@ class RiskManager:
         threshold: float = 0.08,
     ) -> Tuple[float, float]:
         """
-        回撤检查，返回缩放因子
+        Drawdown check; returns a scaling factor
 
-        - DD <= threshold   → scale = 1.0（正常）
-        - DD > threshold    → scale = 0.5（减仓）
-        - DD > 15%          → scale = 0.2（大幅减仓）
+        - DD <= threshold   → scale = 1.0 (normal)
+        - DD > threshold    → scale = 0.5 (reduce positions)
+        - DD > 15%          → scale = 0.2 (sharply reduce positions)
 
         Parameters
         ----------
         equity_curve : Series
-            净值曲线
+            Equity curve
         threshold : float
-            开始减仓的回撤阈值
+            Drawdown threshold at which de-risking begins
 
         Returns
         -------
@@ -371,21 +371,21 @@ class RiskManager:
         scenarios: Optional[Dict[str, Dict[str, float]]] = None,
     ) -> pd.DataFrame:
         """
-        针对预定义情景的压力测试
+        Stress test against predefined scenarios
 
-        通过对历史收益分布施加情景冲击来估算组合损失。
+        Estimates portfolio loss by applying scenario shocks to the historical return distribution.
 
         Parameters
         ----------
         portfolio_returns : Series
-            组合日收益率
+            Portfolio daily returns
         scenarios : dict, optional
-            情景字典，默认使用 STRESS_SCENARIOS
+            Scenario dict; defaults to STRESS_SCENARIOS
 
         Returns
         -------
         DataFrame
-            每个情景的预计损失
+            Projected loss for each scenario
         """
         if scenarios is None:
             scenarios = STRESS_SCENARIOS
@@ -431,21 +431,21 @@ class RiskManager:
         lookback: int = 20,
     ) -> float:
         """
-        波动率目标缩放 — 维持目标年化波动率
+        Volatility targeting scale — maintains a target annualized volatility
 
         Parameters
         ----------
         portfolio_returns : Series
-            组合日收益率
+            Portfolio daily returns
         target : float
-            目标年化波动率
+            Target annualized volatility
         lookback : int
-            回看窗口（交易日）
+            Lookback window (trading days)
 
         Returns
         -------
         float
-            仓位缩放系数（限制在 [0.2, 2.0]）
+            Position scaling factor (clipped to [0.2, 2.0])
         """
         if len(portfolio_returns) < lookback:
             return 1.0
@@ -463,26 +463,26 @@ class RiskManager:
         avg_loss: float,
     ) -> float:
         """
-        Kelly 准则仓位比例
+        Kelly criterion position fraction
 
         f* = (p * b - q) / b
-        其中 p = 胜率, q = 败率, b = 盈亏比
+        where p = win rate, q = loss rate, b = win/loss ratio
 
-        实际使用半 Kelly (f*/2) 以降低波动。
+        In practice half Kelly (f*/2) is used to reduce volatility.
 
         Parameters
         ----------
         win_rate : float
-            胜率 (0~1)
+            Win rate (0~1)
         avg_win : float
-            平均盈利（正值）
+            Average win (positive)
         avg_loss : float
-            平均亏损（正值）
+            Average loss (positive)
 
         Returns
         -------
         float
-            建议仓位比例 (半 Kelly)，限制在 [0, 0.25]
+            Suggested position fraction (half Kelly), clipped to [0, 0.25]
         """
         if avg_loss <= 0 or avg_win <= 0 or not (0 < win_rate < 1):
             return 0.0
@@ -498,14 +498,14 @@ class RiskManager:
         total_risk: float = 0.10,
     ) -> Dict[str, float]:
         """
-        风险预算 — 按等风险贡献分配
+        Risk budgeting — allocate by equal risk contribution
 
         Parameters
         ----------
         sub_strategy_returns : DataFrame
-            各子策略的日收益率，列为策略名
+            Daily returns of each sub-strategy, columns are strategy names
         total_risk : float
-            总风险预算（年化波动率）
+            Total risk budget (annualized volatility)
 
         Returns
         -------
@@ -546,12 +546,12 @@ class RiskManager:
         positions: List[Dict[str, float]],
     ) -> Tuple[Dict[str, float], List[Tuple[str, str, str]]]:
         """
-        检查期权组合希腊字母限额
+        Check option portfolio Greek limits
 
         Parameters
         ----------
         positions : list of dict
-            每个字典包含 {"ticker", "delta", "gamma", "theta", "vega", "quantity"}
+            Each dict contains {"ticker", "delta", "gamma", "theta", "vega", "quantity"}
 
         Returns
         -------
@@ -586,16 +586,16 @@ class RiskManager:
         price_shock: float = 0.10,
     ) -> Dict[str, float]:
         """
-        极端行情下的期权组合最大损失估算
+        Estimate the maximum loss of an option portfolio under extreme market moves
 
-        使用 delta-gamma 近似: ΔP ≈ Δ·S·shock + 0.5·Γ·S²·shock²
+        Uses a delta-gamma approximation: ΔP ≈ Δ·S·shock + 0.5·Γ·S²·shock²
 
         Parameters
         ----------
         option_positions : list of dict
-            每个字典包含 {"ticker", "delta", "gamma", "vega", "underlying_price", "quantity"}
+            Each dict contains {"ticker", "delta", "gamma", "vega", "underlying_price", "quantity"}
         price_shock : float
-            标的价格冲击幅度（如 0.10 = 下跌10%）
+            Size of the underlying price shock (e.g. 0.10 = 10% decline)
 
         Returns
         -------
@@ -649,19 +649,19 @@ class RiskManager:
         equity: float,
     ) -> Tuple[float, bool, str]:
         """
-        保证金充足性检查
+        Margin adequacy check
 
-        使用简化 Reg-T 规则:
-        - 股票多头: 50% 初始保证金
-        - 股票空头: 50% + 额外 max(0, 空头市值-多头市值)
-        - 期权卖方: 20% 标的市值
+        Uses simplified Reg-T rules:
+        - Long stock: 50% initial margin
+        - Short stock: 50% plus an extra max(0, short market value - long market value)
+        - Short options: 20% of underlying market value
 
         Parameters
         ----------
         positions : dict
             {ticker: {"market_value": float, "type": "stock"|"option_long"|"option_short"}, ...}
         equity : float
-            账户净值
+            Account equity
 
         Returns
         -------
@@ -697,19 +697,19 @@ class RiskManager:
         portfolio_state: Dict[str, Any],
     ) -> List[Tuple[str, str, Dict[str, Any]]]:
         """
-        综合评估组合风险，返回 (级别, 消息, 动作) 列表
+        Evaluate overall portfolio risk; returns a list of (level, message, action)
 
-        动作字典可被 AutoTrader 直接执行。
+        The action dicts can be executed directly by AutoTrader.
 
         Parameters
         ----------
         portfolio_state : dict
-            必需键:
+            Required keys:
             - "equity": float
             - "positions": dict  {ticker: market_value}
             - "portfolio_returns": pd.Series
             - "equity_curve": pd.Series
-            可选键:
+            Optional keys:
             - "positions_detail": dict  {ticker: {"market_value", "sector"}}
             - "asset_returns": pd.DataFrame
             - "option_positions": list of dict
@@ -718,10 +718,10 @@ class RiskManager:
         Returns
         -------
         list of (level, message, action_dict)
-            action_dict 含:
+            action_dict contains:
             - "type": "none" | "log" | "reduce" | "close_all"
-            - "scale": float  缩放因子
-            - "targets": list  受影响的标的
+            - "scale": float  scaling factor
+            - "targets": list  affected instruments
         """
         equity = portfolio_state.get("equity", 0)
         positions = portfolio_state.get("positions", {})
@@ -828,17 +828,17 @@ class RiskManager:
         portfolio_state: Dict[str, Any],
     ) -> str:
         """
-        生成格式化风险报告
+        Generate a formatted risk report
 
         Parameters
         ----------
         portfolio_state : dict
-            与 ``evaluate()`` 相同的组合状态字典
+            The same portfolio state dict as ``evaluate()``
 
         Returns
         -------
         str
-            格式化的风险报告文本
+            Formatted risk report text
         """
         equity = portfolio_state.get("equity", 0)
         positions = portfolio_state.get("positions", {})

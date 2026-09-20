@@ -1,14 +1,14 @@
-"""策略统计审计工具箱
+"""Statistical audit toolkit for strategy evaluation.
 
-实现 Statistical Checklist 中 Priority 1 & 2 的所有检查:
+Implements every Priority 1 and Priority 2 check in the Statistical Checklist:
 
-Priority 1 (已在 factor_analysis.py):
+Priority 1 (already in factor_analysis.py):
   1. Newey-West HAC t-stats
   2. Multiple testing correction (Bonferroni / BH-FDR)
   3. VIF multicollinearity
   4. IC autocorrelation + N_eff
 
-Priority 2 (本模块):
+Priority 2 (this module):
   5. Walk-forward CV integrated backtester
   6. Cross-sectional z-score (alternative to rank)
   7. Regime-conditional IC analysis

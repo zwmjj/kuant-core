@@ -1,4 +1,4 @@
-"""新闻情绪因子 — 基于 Alpaca News 数据的情绪信号生成器"""
+"""News sentiment factor - sentiment signal generator built on Alpaca News data"""
 
 import re
 import math
@@ -10,10 +10,10 @@ import pandas as pd
 
 
 class NewsSentimentGenerator:
-    """基于关键词的新闻情绪因子生成器
+    """Keyword-based news sentiment factor generator.
 
-    Alpaca news 数据格式: list[dict]
-        每条新闻包含: headline, created_at, source, symbols, url
+    Alpaca news format: list[dict]
+        Each item carries: headline, created_at, source, symbols, url
     """
 
     # ── 关键词词典 ──
@@ -63,14 +63,14 @@ class NewsSentimentGenerator:
     # ── 单标题评分 ──
 
     def score_headline(self, headline: str) -> float:
-        """对单条新闻标题打情绪分，返回 [-1, 1]
+        """Score a single headline for sentiment, returning a value in [-1, 1].
 
-        算法:
-            1. 分词并转小写
-            2. 统计正面/负面词数量
-            3. 放大词将相邻情绪词权重 ×1.5
-            4. 否定词翻转下一个情绪词的符号
-            5. score = (pos_count - neg_count) / total_words, clip 到 [-1, 1]
+        Algorithm:
+            1. Tokenize and lowercase
+            2. Count positive and negative words
+            3. Intensifiers scale the weight of an adjacent sentiment word by 1.5x
+            4. Negations flip the sign of the following sentiment word
+            5. score = (pos_count - neg_count) / total_words, clipped to [-1, 1]
         """
         tokens = self._WORD_RE.findall(headline.lower())
         if not tokens:
@@ -128,21 +128,22 @@ class NewsSentimentGenerator:
         symbol: str,
         hours: int = 24,
     ) -> float:
-        """聚合特定标的在时间窗口内的情绪得分
+        """Aggregate sentiment scores for one instrument over a lookback window.
 
         Parameters
         ----------
         news_list : list[dict]
-            Alpaca 格式的新闻列表
+            News items in Alpaca format
         symbol : str
-            标的代码，如 'AAPL'
+            Instrument ticker, e.g. 'AAPL'
         hours : int
-            回看时间窗口（小时）
+            Lookback window in hours
 
         Returns
         -------
         float
-            加权平均情绪得分，时间越近权重越高（指数衰减）
+            Weighted-average sentiment score; more recent items carry more
+            weight via exponential decay
         """
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(hours=hours)
@@ -191,17 +192,17 @@ class NewsSentimentGenerator:
         return ranked * 2 - 1
 
     def build_sentiment_signal(self, news_by_symbol: Dict[str, list]) -> pd.Series:
-        """构建截面情绪信号
+        """Build a cross-sectional sentiment signal.
 
         Parameters
         ----------
         news_by_symbol : dict[str, list]
-            键为标的代码，值为该标的相关 Alpaca 新闻列表
+            Keyed by ticker; each value is that instrument's Alpaca news list
 
         Returns
         -------
         pd.Series
-            索引为标的代码，值为 [-1, 1] 的截面排名情绪信号
+            Indexed by ticker; cross-sectionally ranked sentiment in [-1, 1]
         """
         sentiments = {}
         for symbol, news_list in news_by_symbol.items():
@@ -213,19 +214,20 @@ class NewsSentimentGenerator:
         return self._cross_sectional_rank(series)
 
     def news_volume_signal(self, news_by_symbol: Dict[str, list]) -> pd.Series:
-        """新闻数量信号 — 关注度因子
+        """News-count signal - an attention factor.
 
-        更多新闻 = 更多市场关注，截面排名后输出
+        More news items means more market attention; the count is
+        cross-sectionally ranked before being returned.
 
         Parameters
         ----------
         news_by_symbol : dict[str, list]
-            键为标的代码，值为该标的新闻列表
+            Keyed by ticker; each value is that instrument's news list
 
         Returns
         -------
         pd.Series
-            索引为标的代码，值为 [-1, 1] 的截面排名
+            Indexed by ticker; cross-sectional rank in [-1, 1]
         """
         counts = {sym: len(news) for sym, news in news_by_symbol.items()}
         series = pd.Series(counts, dtype=float)
@@ -234,19 +236,19 @@ class NewsSentimentGenerator:
         return self._cross_sectional_rank(series)
 
     def news_breadth_signal(self, news_by_symbol: Dict[str, list]) -> pd.Series:
-        """新闻广度信号 — 来源多样性因子
+        """News-breadth signal - a source-diversity factor.
 
-        覆盖来源越多，信号越强
+        The more distinct sources cover an instrument, the stronger the signal.
 
         Parameters
         ----------
         news_by_symbol : dict[str, list]
-            键为标的代码，值为该标的新闻列表
+            Keyed by ticker; each value is that instrument's news list
 
         Returns
         -------
         pd.Series
-            索引为标的代码，值为 [-1, 1] 的截面排名
+            Indexed by ticker; cross-sectional rank in [-1, 1]
         """
         breadth = {}
         for sym, news_list in news_by_symbol.items():
@@ -266,23 +268,24 @@ class NewsSentimentGenerator:
         w_volume: float = 0.3,
         w_breadth: float = 0.2,
     ) -> pd.Series:
-        """复合新闻信号 — 情绪 + 关注度 + 广度加权组合
+        """Composite news signal - a weighted blend of sentiment, attention and breadth.
 
         Parameters
         ----------
         news_by_symbol : dict[str, list]
-            键为标的代码，值为该标的新闻列表
+            Keyed by ticker; each value is that instrument's news list
         w_sentiment : float
-            情绪信号权重，默认 0.5
+            Weight on the sentiment signal, default 0.5
         w_volume : float
-            新闻数量信号权重，默认 0.3
+            Weight on the news-count signal, default 0.3
         w_breadth : float
-            来源广度信号权重，默认 0.2
+            Weight on the source-breadth signal, default 0.2
 
         Returns
         -------
         pd.Series
-            索引为标的代码，值为 [-1, 1] 的复合信号（截面排名后输出）
+            Indexed by ticker; composite signal in [-1, 1], cross-sectionally
+            ranked before being returned
         """
         sig_sent = self.build_sentiment_signal(news_by_symbol)
         sig_vol = self.news_volume_signal(news_by_symbol)

@@ -1,16 +1,17 @@
-"""因子重要性分析与最优Alpha组合筛选
+"""Factor importance analysis and optimal alpha combination search
 
-使用 LightGBM / XGBoost / Permutation Importance 对因子进行重要性排序，
-并通过逐步前向选择和组合枚举找到最强 alpha 因子组合。
+Ranks factors by importance using LightGBM / XGBoost / permutation importance,
+then finds the strongest alpha factor combination via stepwise forward selection
+and combination enumeration.
 
-日频因子 (signals_daily.py):
+Daily factors (signals_daily.py):
     momentum_5d, momentum_20d, momentum_reversal_5d,
     volume_surge, dollar_volume_rank, volume_price_trend, volume_price_divergence,
     vwap_deviation, vwap_reversion,
     realized_vol_20d, vol_breakout, overnight_gap,
     amihud_illiquidity, trade_intensity, high_low_spread
 
-月频因子 (signals.py):
+Monthly factors (signals.py):
     mom12, accel, high52, bm, ep, roe, gpa, ag,
     turnover, revgrowth, de, ps, nigrowth,
     ivol, ff5alpha, lowvol, vov, downvol, maxret, beta, skew, volts, volmom
@@ -31,15 +32,15 @@ import matplotlib.pyplot as plt
 
 
 class FactorSelector:
-    """因子重要性分析与最优组合筛选器
+    """Factor importance analysis and optimal combination selector
 
-    工作流程:
-    1. prepare_features: 因子矩阵 + 前瞻收益 → 对齐的 X, y
-    2. lgbm_importance / xgb_importance: 树模型特征重要性
-    3. permutation_importance: 置换重要性（模型无关）
-    4. stepwise_selection: 逐步前向选择最优因子组合
-    5. find_best_combination: 枚举 top N 因子的最优子集
-    6. generate_report: 完整分析报告
+    Workflow:
+    1. prepare_features: factor matrices + forward returns -> aligned X, y
+    2. lgbm_importance / xgb_importance: tree-model feature importance
+    3. permutation_importance: permutation importance (model agnostic)
+    4. stepwise_selection: stepwise forward selection of the best factor combination
+    5. find_best_combination: enumerate the best subset of the top N factors
+    6. generate_report: full analysis report
     """
 
     def __init__(self, train_ratio: float = 0.7, random_state: int = 42):
@@ -64,23 +65,23 @@ class FactorSelector:
         returns: pd.DataFrame,
         forward_period: int = 5,
     ) -> Tuple[pd.DataFrame, pd.Series]:
-        """将因子矩阵和前瞻收益对齐，构建训练用 X, y
+        """Align the factor matrices with forward returns to build X, y for training
 
         Parameters
         ----------
         factors_dict : dict
-            因子名 → DataFrame (index=日期, columns=股票代码)
+            Factor name -> DataFrame (index=date, columns=ticker)
         returns : pd.DataFrame
-            日收益率 DataFrame (index=日期, columns=股票代码)
+            Daily return DataFrame (index=date, columns=ticker)
         forward_period : int
-            前瞻收益天数，默认 5 (一周)
+            Forward return horizon in days, default 5 (one week)
 
         Returns
         -------
         X : pd.DataFrame
-            特征矩阵，每行对应 (日期, 股票) 的因子值
+            Feature matrix; each row holds the factor values for one (date, stock) pair
         y : pd.Series
-            前瞻累计收益
+            Forward cumulative return
         """
         # 计算前瞻收益: 未来 forward_period 天的累计收益
         forward_ret = returns.shift(-forward_period).rolling(forward_period).sum()
@@ -156,20 +157,20 @@ class FactorSelector:
     def lgbm_importance(
         self, X: pd.DataFrame, y: pd.Series
     ) -> pd.DataFrame:
-        """用 LightGBM 训练并返回特征重要性排序 (gain + split 两种)
+        """Train a LightGBM model and return the feature importance ranking (both gain and split)
 
         Parameters
         ----------
         X : pd.DataFrame
-            特征矩阵
+            Feature matrix
         y : pd.Series
-            目标变量（前瞻收益）
+            Target variable (forward return)
 
         Returns
         -------
         pd.DataFrame
             columns=['feature', 'gain', 'split', 'gain_rank', 'split_rank']
-            按 gain 降序排列
+            Sorted by gain in descending order
         """
         X_train, X_test, y_train, y_test = self._time_split(X, y)
 
@@ -227,7 +228,7 @@ class FactorSelector:
     def xgb_importance(
         self, X: pd.DataFrame, y: pd.Series
     ) -> pd.DataFrame:
-        """用 XGBoost 训练并返回特征重要性排序，作为 LightGBM 的对比
+        """Train an XGBoost model and return the feature importance ranking, as a cross-check against LightGBM
 
         Returns
         -------
@@ -290,15 +291,15 @@ class FactorSelector:
         model=None,
         n_repeats: int = 10,
     ) -> pd.DataFrame:
-        """用 sklearn permutation_importance 计算因子重要性
+        """Compute factor importance with sklearn's permutation_importance
 
         Parameters
         ----------
         X : pd.DataFrame
         y : pd.Series
-        model : 已训练的 sklearn 兼容模型，默认用 LightGBM
+        model : A fitted sklearn-compatible model; defaults to LightGBM
         n_repeats : int
-            置换重复次数
+            Number of permutation repeats
 
         Returns
         -------
@@ -356,22 +357,22 @@ class FactorSelector:
         y: pd.Series,
         max_factors: int = 8,
     ) -> List[dict]:
-        """逐步前向选择最优因子组合
+        """Stepwise forward selection of the best factor combination
 
-        每步加入使 IC (信息系数 = rank correlation) 提升最大的因子。
-        使用测试集 IC 避免过拟合。
+        At each step, adds the factor that most improves IC (information coefficient =
+        rank correlation). Test-set IC is used to guard against overfitting.
 
         Parameters
         ----------
         X : pd.DataFrame
         y : pd.Series
         max_factors : int
-            最多选择的因子数
+            Maximum number of factors to select
 
         Returns
         -------
         list of dict
-            每步的结果: {'step', 'added_factor', 'selected', 'train_ic', 'test_ic'}
+            Per-step results: {'step', 'added_factor', 'selected', 'train_ic', 'test_ic'}
         """
         X_train, X_test, y_train, y_test = self._time_split(X, y)
 
@@ -436,24 +437,24 @@ class FactorSelector:
         min_size: int = 2,
         max_size: int = 5,
     ) -> pd.DataFrame:
-        """枚举 top N 因子的所有组合，找出最优子集
+        """Enumerate every combination of the top N factors and find the best subset
 
         Parameters
         ----------
         X : pd.DataFrame
         y : pd.Series
         top_n : int
-            只考虑重要性排名前 top_n 的因子
+            Only consider the top_n factors by importance
         min_size : int
-            最小组合大小
+            Minimum combination size
         max_size : int
-            最大组合大小
+            Maximum combination size
 
         Returns
         -------
         pd.DataFrame
             columns=['combination', 'size', 'train_ic', 'test_ic', 'ic_decay']
-            按 test_ic 降序排列
+            Sorted by test_ic in descending order
         """
         # 先用 LightGBM 获取 top N 因子
         lgbm_result = self.lgbm_importance(X, y)
@@ -504,20 +505,20 @@ class FactorSelector:
         figsize: Tuple[int, int] = (10, 6),
         save_path: Optional[str] = None,
     ):
-        """因子重要性柱状图
+        """Bar chart of factor importance
 
         Parameters
         ----------
         results : pd.DataFrame
-            lgbm_importance / xgb_importance 的输出
+            Output of lgbm_importance / xgb_importance
         title : str
         importance_col : str
-            使用哪列作为重要性度量
+            Which column to use as the importance measure
         top_n : int
-            显示前 N 个因子
+            Number of top factors to display
         figsize : tuple
         save_path : str or None
-            保存路径，None 则显示
+            Path to save to; if None, the chart is displayed
         """
         df = results.head(top_n).copy()
         df = df.sort_values(importance_col, ascending=True)  # 水平柱状图从下到上
@@ -539,7 +540,7 @@ class FactorSelector:
 
     @staticmethod
     def plot_stepwise(history: List[dict], save_path: Optional[str] = None):
-        """逐步选择过程的 IC 变化图"""
+        """Chart of how IC evolves through the stepwise selection process."""
         steps = [h['step'] for h in history]
         train_ics = [h['train_ic'] for h in history]
         test_ics = [h['test_ic'] for h in history]
@@ -576,36 +577,36 @@ class FactorSelector:
         max_factors: int = 8,
         save_dir: Optional[str] = None,
     ) -> dict:
-        """生成完整因子重要性分析报告
+        """Generate the full factor importance analysis report
 
-        流程:
-        1. 数据准备与对齐
-        2. LightGBM 特征重要性
-        3. XGBoost 特征重要性（对比）
-        4. 置换重要性
-        5. 逐步前向选择
-        6. 组合枚举（带外测试）
-        7. 可视化输出
+        Pipeline:
+        1. Data preparation and alignment
+        2. LightGBM feature importance
+        3. XGBoost feature importance (cross-check)
+        4. Permutation importance
+        5. Stepwise forward selection
+        6. Combination enumeration (with out-of-sample testing)
+        7. Visualization output
 
         Parameters
         ----------
         factors_dict : dict
-            因子名 → DataFrame
+            Factor name -> DataFrame
         returns : pd.DataFrame
-            日收益率
+            Daily returns
         forward_period : int
-            前瞻天数
+            Forward horizon in days
         top_n : int
-            枚举最优组合时考虑的 top N 因子
+            Number of top factors to consider when enumerating combinations
         max_factors : int
-            逐步选择最大因子数
+            Maximum number of factors for stepwise selection
         save_dir : str or None
-            图表保存目录
+            Directory to save charts to
 
         Returns
         -------
         dict
-            包含所有分析结果的字典
+            Dict containing all analysis results
         """
         print("=" * 70)
         print("  因子重要性分析报告")

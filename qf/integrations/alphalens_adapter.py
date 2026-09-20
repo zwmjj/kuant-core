@@ -1,7 +1,7 @@
-"""Alphalens 因子分析适配器
+"""Alphalens factor analysis adapter
 Alphalens: https://github.com/quantopian/alphalens
-提供因子 IC 分析、分组收益、换手率等量化因子评估工具。
-结果以 dict 返回, 方便 JSON 序列化传给 API 层。
+Provides factor evaluation tools such as IC analysis, quantile returns and turnover.
+Results are returned as dicts so they serialize cleanly to JSON for the API layer.
 """
 import warnings
 import numpy as np
@@ -87,18 +87,18 @@ def run_factor_analysis(
     periods: tuple = (1, 5, 10),
     quantiles: int = 5,
 ) -> dict:
-    """运行完整因子分析, 返回 JSON-serializable 结果。
+    """Run the full factor analysis and return a JSON-serializable result.
 
     Parameters
     ----------
     factor_data : pd.DataFrame
-        信号矩阵 (date x stock)
+        Signal matrix (date x stock)
     prices : pd.DataFrame
-        价格矩阵 (date x stock)
+        Price matrix (date x stock)
     periods : tuple
-        前向收益计算期
+        Forward-return horizons
     quantiles : int
-        分组数
+        Number of quantile buckets
 
     Returns
     -------
@@ -163,23 +163,23 @@ def compute_ic_series(
     returns: pd.DataFrame,
     method: str = "spearman",
 ) -> pd.Series:
-    """计算截面 IC (Information Coefficient) 时间序列。
+    """Compute the cross-sectional IC (Information Coefficient) time series.
 
-    不依赖 Alphalens, 纯 pandas 实现。
+    Pure pandas implementation, no Alphalens dependency.
 
     Parameters
     ----------
     factor : pd.DataFrame
-        信号矩阵 (date x stock)
+        Signal matrix (date x stock)
     returns : pd.DataFrame
-        下期收益矩阵 (date x stock)
+        Next-period return matrix (date x stock)
     method : str
-        'spearman' (rank IC) 或 'pearson'
+        'spearman' (rank IC) or 'pearson'
 
     Returns
     -------
     pd.Series
-        每期截面相关系数
+        Per-period cross-sectional correlation
     """
     common_dates = factor.index.intersection(returns.index)
     common_cols = factor.columns.intersection(returns.columns)
@@ -205,16 +205,16 @@ def factor_tear_sheet(
     returns: pd.DataFrame,
     quantiles: int = 5,
 ) -> dict:
-    """生成因子 tear sheet 摘要 (纯 pandas 实现, 不依赖 Alphalens)。
+    """Build a factor tear sheet summary (pure pandas, no Alphalens dependency).
 
     Parameters
     ----------
     factor : pd.DataFrame
-        信号矩阵
+        Signal matrix
     returns : pd.DataFrame
-        下期收益矩阵
+        Next-period return matrix
     quantiles : int
-        分组数
+        Number of quantile buckets
 
     Returns
     -------
@@ -276,19 +276,19 @@ def factor_tear_sheet(
 
 
 def compute_turnover(factor: pd.DataFrame, top_n: int = 20) -> pd.Series:
-    """计算因子信号的换手率 (top N 持仓变化比例)。
+    """Compute the turnover of a factor signal (fraction of the top N holdings that change).
 
     Parameters
     ----------
     factor : pd.DataFrame
-        信号矩阵
+        Signal matrix
     top_n : int
-        持仓数量
+        Number of holdings
 
     Returns
     -------
     pd.Series
-        每期换手率 [0, 1]
+        Per-period turnover in [0, 1]
     """
     turnover_list = []
     prev_holdings = set()
@@ -310,16 +310,16 @@ def compute_quantile_returns(
     returns: pd.DataFrame,
     quantiles: int = 5,
 ) -> pd.DataFrame:
-    """计算每个分位组的平均收益时间序列。
+    """Compute the average return time series for each quantile bucket.
 
     Parameters
     ----------
     factor : pd.DataFrame
-        信号矩阵
+        Signal matrix
     returns : pd.DataFrame
-        下期收益矩阵
+        Next-period return matrix
     quantiles : int
-        分组数
+        Number of quantile buckets
 
     Returns
     -------

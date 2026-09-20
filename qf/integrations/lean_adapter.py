@@ -1,6 +1,6 @@
-"""QuantConnect LEAN 引擎适配器
+"""QuantConnect LEAN engine adapter
 QuantConnect LEAN: https://github.com/QuantConnect/Lean
-将 Kuant 因子/策略集成到 LEAN 引擎，支持回测与实盘。
+Integrates Kuant factors/strategies into the LEAN engine for backtesting and live trading.
 """
 import json
 import os
@@ -52,10 +52,10 @@ def _check_lean():
 
 
 def map_symbol_kuant_to_lean(symbol: str) -> str:
-    """Kuant ticker → LEAN Symbol 字符串映射。
+    """Map a Kuant ticker to a LEAN Symbol string.
 
-    Kuant 常用大写美股 ticker (如 'AAPL')，LEAN 也用大写，
-    但中国 A 股需特殊处理 (如 '600000' → '600000 XSHG')。
+    Kuant uses uppercase US tickers (e.g. 'AAPL') and so does LEAN, but China
+    A-shares need special handling (e.g. '600000' -> '600000 XSHG').
     """
     symbol = str(symbol).strip().upper()
 
@@ -71,7 +71,7 @@ def map_symbol_kuant_to_lean(symbol: str) -> str:
 
 
 def map_symbol_lean_to_kuant(symbol: str) -> str:
-    """LEAN Symbol 字符串 → Kuant ticker 映射。"""
+    """Map a LEAN Symbol string back to a Kuant ticker."""
     symbol = str(symbol).strip()
     # 去掉交易所后缀
     for suffix in (" XSHG", " XSHE", " XNYS", " XNAS"):
@@ -93,27 +93,27 @@ def signal_to_lean_targets(
     long_pct: float = 1.0,
     short_pct: float = 0.0,
 ) -> Dict[str, float]:
-    """从 Kuant 信号矩阵提取目标持仓权重。
+    """Extract target position weights from a Kuant signal matrix.
 
     Parameters
     ----------
     signal_df : pd.DataFrame
-        信号矩阵 (date x stock)，值越高越看多
+        Signal matrix (date x stock); higher values are more bullish
     date : str / Timestamp / datetime
-        当前日期
+        Current date
     long_n : int
-        做多股票数量
+        Number of stocks to hold long
     short_n : int
-        做空股票数量
+        Number of stocks to hold short
     long_pct : float
-        多头总仓位占比 (1.0 = 100%)
+        Total long position as a fraction of capital (1.0 = 100%)
     short_pct : float
-        空头总仓位占比
+        Total short position as a fraction of capital
 
     Returns
     -------
     dict
-        {symbol: weight}, 正值做多, 负值做空
+        {symbol: weight}; positive is long, negative is short
     """
     date = pd.Timestamp(date)
 
@@ -151,17 +151,17 @@ def signal_to_lean_targets(
 
 
 def lean_results_to_kuant(lean_results: Dict[str, Any]) -> Dict[str, Any]:
-    """LEAN 回测结果转 Kuant 标准指标 dict。
+    """Convert LEAN backtest results into a standard Kuant metrics dict.
 
     Parameters
     ----------
     lean_results : dict
-        LEAN 输出的回测统计（从 backtests/ JSON 或 API 获取）
+        Backtest statistics emitted by LEAN (from the backtests/ JSON or the API)
 
     Returns
     -------
     dict
-        Kuant 标准指标，兼容 BacktestResult.metrics() 输出格式
+        Standard Kuant metrics, matching the output format of BacktestResult.metrics()
     """
     stats = lean_results.get("Statistics", lean_results)
 
@@ -209,17 +209,17 @@ def lean_results_to_kuant(lean_results: Dict[str, Any]) -> Dict[str, Any]:
 if _HAS_LEAN:
 
     class KuantAlgorithm(QCAlgorithm):
-        """LEAN 算法基类，集成 Kuant 信号。
+        """Base LEAN algorithm class integrating Kuant signals.
 
-        子类需设置:
-            self.signal_df: 信号矩阵 (date x stock DataFrame)
-            self.universe_symbols: 股票池列表
+        Subclasses must set:
+            self.signal_df: signal matrix (date x stock DataFrame)
+            self.universe_symbols: list of universe symbols
 
-        或传入 BaseStrategy 实例使用 KuantStrategyWrapper。
+        Alternatively, pass a BaseStrategy instance via KuantStrategyWrapper.
         """
 
         def Initialize(self):
-            """初始化算法：设置 universe, resolution, rebalance schedule。"""
+            """Initialize the algorithm: set the universe, resolution and rebalance schedule."""
             # --- 默认参数 (子类可在 super().Initialize() 前覆盖) ---
             if not hasattr(self, "start_date"):
                 self.start_date = datetime(2020, 1, 1)
@@ -265,7 +265,7 @@ if _HAS_LEAN:
             self._last_rebalance = None
 
         def OnData(self, data):
-            """接收行情，触发信号计算和下单。"""
+            """Consume market data, then trigger signal computation and order placement."""
             self._bar_count += 1
             if self._bar_count % self.rebalance_days != 0:
                 return
@@ -273,7 +273,7 @@ if _HAS_LEAN:
             self.Rebalance(data)
 
         def Rebalance(self, data=None):
-            """定期再平衡，调用 Kuant 信号生成目标仓位。"""
+            """Periodic rebalance: call the Kuant signal to build target positions."""
             current_date = self.Time
 
             if self.signal_df is None or self.signal_df.empty:
@@ -360,10 +360,10 @@ if _HAS_LEAN:
 
 
     class KuantUniverseSelection:
-        """自定义 Universe 选股，对接 Kuant 的 tradable_mask。
+        """Custom universe selection driven by Kuant's tradable_mask.
 
-        在 LEAN 的 CoarseSelectionFunction 中使用，根据 Kuant 信号矩阵
-        的列名（即有效信号的股票）来筛选 Universe。
+        Used inside LEAN's CoarseSelectionFunction to filter the universe by the
+        columns of the Kuant signal matrix (i.e. the stocks with valid signals).
         """
 
         def __init__(self, signal_df: pd.DataFrame, tradable_mask: Optional[pd.DataFrame] = None):
@@ -379,7 +379,7 @@ if _HAS_LEAN:
             self.tradable_mask = tradable_mask
 
         def get_universe(self, date: Union[str, pd.Timestamp, datetime]) -> List[str]:
-            """获取指定日期的可交易股票池。"""
+            """Get the tradable universe for a given date."""
             date = pd.Timestamp(date)
             if self.tradable_mask is not None and date in self.tradable_mask.index:
                 row = self.tradable_mask.loc[date]
@@ -389,7 +389,7 @@ if _HAS_LEAN:
             return []
 
         def CoarseSelectionFunction(self, algorithm, coarse):
-            """LEAN CoarseSelectionFunction 接口。"""
+            """LEAN CoarseSelectionFunction interface."""
             universe = self.get_universe(algorithm.Time)
             return [
                 c.Symbol
@@ -399,9 +399,9 @@ if _HAS_LEAN:
 
 
     class KuantFeeModel:
-        """自定义费率模型，对接 Kuant 的 ExecutionHandler 成本参数。
+        """Custom fee model backed by Kuant's ExecutionHandler cost parameters.
 
-        将 Kuant 的 commission_bps, spread_bps 等映射到 LEAN 的 FeeModel 接口。
+        Maps Kuant's commission_bps, spread_bps and related settings onto LEAN's FeeModel interface.
         """
 
         def __init__(
@@ -425,7 +425,7 @@ if _HAS_LEAN:
             self.short_borrow_rate = short_borrow_bps / 10000.0 / 252.0  # 日化
 
         def GetOrderFee(self, parameters):
-            """LEAN FeeModel 接口：计算订单费用。"""
+            """LEAN FeeModel interface: compute the fee for an order."""
             order = parameters.Order
             security = parameters.Security
             price = security.Price
@@ -448,21 +448,21 @@ else:
     # LEAN 未安装时的 Stub 类
 
     class KuantAlgorithm:
-        """Stub: QuantConnect LEAN 未安装。"""
+        """Stub: QuantConnect LEAN is not installed."""
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "QuantConnect LEAN 未安装。请运行: pip install quantconnect"
             )
 
     class KuantUniverseSelection:
-        """Stub: QuantConnect LEAN 未安装。"""
+        """Stub: QuantConnect LEAN is not installed."""
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "QuantConnect LEAN 未安装。请运行: pip install quantconnect"
             )
 
     class KuantFeeModel:
-        """Stub: QuantConnect LEAN 未安装。"""
+        """Stub: QuantConnect LEAN is not installed."""
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "QuantConnect LEAN 未安装。请运行: pip install quantconnect"
@@ -475,21 +475,21 @@ else:
 
 
 class KuantStrategyWrapper:
-    """包装任意 Kuant BaseStrategy，转为 LEAN 可执行算法。
+    """Wrap any Kuant BaseStrategy into a LEAN-executable algorithm.
 
-    在 LEAN 的 OnData 中调用 strategy.generate_signal()，
-    将 Kuant 信号格式 (date x stock DataFrame) 转为 LEAN 订单。
+    Calls strategy.generate_signal() from LEAN's OnData and converts the Kuant
+    signal format (date x stock DataFrame) into LEAN orders.
 
-    用法:
+    Usage:
         from qf.strategy import BaseStrategy
 
         class MyStrat(BaseStrategy):
-            name = "动量因子"
+            name = "Momentum Factor"
             def generate_signal(self, data):
                 return signal_df
 
         wrapper = KuantStrategyWrapper(MyStrat(), data_dict)
-        # 将 wrapper 传入 run_lean_backtest() 或 generate_lean_project()
+        # pass wrapper to run_lean_backtest() or generate_lean_project()
     """
 
     def __init__(
@@ -543,17 +543,17 @@ class KuantStrategyWrapper:
 
     @property
     def signal_df(self) -> pd.DataFrame:
-        """获取信号矩阵，懒加载。"""
+        """Get the signal matrix (lazily computed)."""
         if self._signal_df is None and self.data is not None:
             self._precompute_signal()
         return self._signal_df if self._signal_df is not None else pd.DataFrame()
 
     def get_targets(self, date: Union[str, pd.Timestamp, datetime]) -> Dict[str, float]:
-        """获取指定日期的目标持仓权重。
+        """Get the target position weights for a given date.
 
         Parameters
         ----------
-        date : 日期
+        date : date
 
         Returns
         -------
@@ -570,18 +570,18 @@ class KuantStrategyWrapper:
         )
 
     def get_universe(self) -> List[str]:
-        """从信号矩阵提取完整股票池。"""
+        """Extract the full universe from the signal matrix."""
         if self.signal_df is not None and not self.signal_df.empty:
             return [str(c) for c in self.signal_df.columns]
         return []
 
     def generate_lean_algorithm_code(self) -> str:
-        """生成可在 LEAN 中直接运行的 Python 算法代码。
+        """Generate Python algorithm code that runs directly in LEAN.
 
         Returns
         -------
         str
-            完整的 LEAN 算法 Python 代码
+            Complete LEAN algorithm Python source
         """
         strategy_name = self.strategy.name.replace(" ", "_")
         symbols_str = ", ".join(f'"{s}"' for s in self.get_universe()[:200])
@@ -641,30 +641,30 @@ def run_lean_backtest(
     strategy: Union[KuantStrategyWrapper, Any],
     config: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """配置并运行 LEAN 本地回测。
+    """Configure and run a local LEAN backtest.
 
-    通过 LEAN CLI (lean-cli) 在本地 Docker 中运行回测。
-    需要预先安装: pip install lean
+    Runs the backtest in local Docker via the LEAN CLI (lean-cli).
+    Requires: pip install lean
 
     Parameters
     ----------
-    strategy : KuantStrategyWrapper 或 BaseStrategy
-        Kuant 策略 (如果是 BaseStrategy 会自动包装)
+    strategy : KuantStrategyWrapper or BaseStrategy
+        Kuant strategy (a BaseStrategy is wrapped automatically)
     config : dict
-        回测配置:
-        - start_date: str, 如 '2020-01-01'
-        - end_date: str, 如 '2024-12-31'
-        - cash: float, 初始资金 (默认 1,000,000)
-        - resolution: str, 'daily' / 'hour' / 'minute' (默认 'daily')
-        - universe: list[str], 股票池 (可选, 从策略推断)
-        - data_path: str, LEAN 数据目录 (可选)
-        - output_dir: str, 输出目录 (默认 './lean_output')
-        - lean_cli: bool, 是否用 lean-cli 运行 (默认 True)
+        Backtest configuration:
+        - start_date: str, e.g. '2020-01-01'
+        - end_date: str, e.g. '2024-12-31'
+        - cash: float, initial capital (default 1,000,000)
+        - resolution: str, 'daily' / 'hour' / 'minute' (default 'daily')
+        - universe: list[str], universe (optional, inferred from the strategy)
+        - data_path: str, LEAN data directory (optional)
+        - output_dir: str, output directory (default './lean_output')
+        - lean_cli: bool, whether to run via lean-cli (default True)
 
     Returns
     -------
     dict
-        标准化结果 (total_return, sharpe, max_drawdown, cagr 等)
+        Standardized results (total_return, sharpe, max_drawdown, cagr, etc.)
     """
     # 自动包装 BaseStrategy
     if not isinstance(strategy, KuantStrategyWrapper):
@@ -770,27 +770,27 @@ def run_lean_live(
     strategy: Union[KuantStrategyWrapper, Any],
     broker_config: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """连接券商实盘，通过 LEAN CLI 启动实盘交易。
+    """Connect to a broker and start live trading through the LEAN CLI.
 
     Parameters
     ----------
-    strategy : KuantStrategyWrapper 或 BaseStrategy
-        Kuant 策略
+    strategy : KuantStrategyWrapper or BaseStrategy
+        Kuant strategy
     broker_config : dict
-        券商配置:
-        - broker: str, 券商名称，目前支持 'alpaca' (默认)
+        Broker configuration:
+        - broker: str, broker name; currently 'alpaca' is supported (default)
         - api_key: str, API key
         - secret: str, API secret
-        - paper_trading: bool, 是否纸盘 (默认 True)
-        - base_url: str, API 地址 (可选)
-        - environment: str, 'paper' / 'live' (可选, 从 paper_trading 推断)
-        - data_feed: str, 数据源 (可选, 默认跟随 broker)
-        - output_dir: str, 项目输出目录
+        - paper_trading: bool, whether to use paper trading (default True)
+        - base_url: str, API endpoint (optional)
+        - environment: str, 'paper' / 'live' (optional, inferred from paper_trading)
+        - data_feed: str, data source (optional, defaults to the broker's own feed)
+        - output_dir: str, project output directory
 
     Returns
     -------
     dict
-        启动状态信息
+        Launch status information
     """
     # 自动包装
     if not isinstance(strategy, KuantStrategyWrapper):
@@ -896,27 +896,27 @@ def generate_lean_config(
     resolution: str = "daily",
     broker: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """生成 LEAN 的 config.json 内容。
+    """Build the contents of LEAN's config.json.
 
     Parameters
     ----------
     strategy_name : str
-        策略名称
+        Strategy name
     start : str
-        开始日期 'YYYY-MM-DD'
+        Start date 'YYYY-MM-DD'
     end : str
-        结束日期 'YYYY-MM-DD'
+        End date 'YYYY-MM-DD'
     cash : float
-        初始资金
+        Initial capital
     resolution : str
-        数据分辨率: 'daily', 'hour', 'minute'
+        Data resolution: 'daily', 'hour', 'minute'
     broker : str, optional
-        券商: 'alpaca', None (回测模式)
+        Broker: 'alpaca', or None for backtest mode
 
     Returns
     -------
     dict
-        LEAN config.json 内容
+        LEAN config.json contents
     """
     config = {
         "algorithm-type-name": strategy_name.replace(" ", ""),
@@ -948,21 +948,21 @@ def generate_lean_project(
     output_dir: str,
     config: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """生成完整 LEAN 项目文件夹 (main.py + config.json)。
+    """Generate a complete LEAN project folder (main.py + config.json).
 
     Parameters
     ----------
     strategy : KuantStrategyWrapper
-        包装后的 Kuant 策略
+        Wrapped Kuant strategy
     output_dir : str
-        输出目录路径
+        Output directory path
     config : dict, optional
-        额外配置参数
+        Additional configuration parameters
 
     Returns
     -------
     str
-        项目目录路径
+        Project directory path
     """
     if not isinstance(strategy, KuantStrategyWrapper):
         from qf.strategy import BaseStrategy
@@ -1020,7 +1020,7 @@ if __name__ == "__main__":
 
     # --- 示例策略 ---
     class MomentumStrategy(BaseStrategy):
-        """动量因子策略示例"""
+        """Example momentum factor strategy."""
         name = "Momentum_12_1"
         description = "12个月动量 (跳过最近1个月)"
         long_n = 50
